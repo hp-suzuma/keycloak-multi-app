@@ -1,0 +1,94 @@
+{
+  "realm": "myapp",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "clients": [
+    {
+      "clientId": "global-login",
+      "name": "Global BFF",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "global-secret",
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://global.example.com/auth/callback"
+      ],
+      "webOrigins": [
+        "https://global.example.com"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "app-a",
+      "name": "Site A BFF",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "app-a-secret",
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://a.example.com/auth/callback"
+      ],
+      "webOrigins": [
+        "https://a.example.com"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "app-b",
+      "name": "Site B BFF",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "app-b-secret",
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://b.example.com/auth/callback"
+      ],
+      "webOrigins": [
+        "https://b.example.com"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "id": "tenant-user-a",
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "tenant-user-b",
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bob@example.com",
+      "firstName": "Bob",
+      "lastName": "B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
