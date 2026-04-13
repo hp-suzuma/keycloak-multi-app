@@ -191,10 +191,24 @@ services:
       retries: 5
       start_period: 20s
 
+  ap-frontend:
+    build:
+      context: .
+      dockerfile: docker/ap-frontend/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./ap-server/frontend:/app
+      - ap-frontend-node-modules:/app/node_modules
+    tty: true
+    stdin_open: true
+    networks:
+      - internal
+
 networks:
   internal:
     driver: bridge
 
 volumes:
+  ap-frontend-node-modules:
   postgres-data:
   pgadmin-data:

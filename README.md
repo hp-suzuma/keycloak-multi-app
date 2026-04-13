@@ -167,6 +167,23 @@ AP Server
 4. 開発用の簡易ログインを入れる
 5. SSO 連携時のユーザー受け取り口をつなぐ
 
+## 新しい AP サーバーの初期フォルダ構成
+
+現時点では、新しい AP サーバーの作業領域を次のように分離します。
+
+```text
+ap-server/
+├── frontend/
+├── backend/
+└── docs/
+```
+
+- `frontend/` は `Nuxt 4 + Nuxt UI` の雛形作成先
+- `backend/` は `Laravel 13` の雛形作成先
+- `docs/` は AP サーバー固有メモの置き場
+
+詳細は [ap-server/README.md](/home/wsat/projects/keycloak-multi-app/ap-server/README.md) を参照してください。
+
 ## 次のチャットで始めること
 
 次の新しいチャットでは、`新しい AP サーバーの構築` から開始します。
