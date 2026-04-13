@@ -204,11 +204,28 @@ services:
     networks:
       - internal
 
+  ap-backend:
+    build:
+      context: .
+      dockerfile: docker/ap-backend/Dockerfile
+    working_dir: /var/www/app
+    user: "1000:1000"
+    volumes:
+      - ./ap-server/backend:/var/www/app
+      - ap-backend-composer-cache:/tmp/composer-cache
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+    tty: true
+    stdin_open: true
+    networks:
+      - internal
+
 networks:
   internal:
     driver: bridge
 
 volumes:
+  ap-backend-composer-cache:
   ap-frontend-node-modules:
   postgres-data:
   pgadmin-data:

@@ -41,3 +41,21 @@ docker compose exec ap-frontend sh
 ```
 
 このコンテナ内で `Nuxt 4 + Nuxt UI` の初期化を進めます。
+
+## バックエンド作業コンテナ
+
+`ap-server/backend` は、専用の `ap-backend` コンテナに入って作業する前提です。
+
+起動:
+
+```bash
+docker compose up -d ap-backend
+```
+
+コンテナへ入る:
+
+```bash
+docker compose exec ap-backend bash
+```
+
+このコンテナ内で `Laravel 13` の初期化を進めます。
