@@ -1,49 +1,195 @@
 # keycloak-multi-app
 
-Ubuntu 上の Docker で、`Keycloak + Laravel + Nuxt` を `nginx + domain + https` の本番寄り構成で動かす最小サンプルです。
+このリポジトリは、`新しい AP サーバーのプロトタイプ開発` を主目的にした作業土台です。  
+Keycloak を使った認証環境は維持しますが、優先順位は `認証の作り込み` より `AP サーバーの画面・API・業務ロジックを前に進めること` に置きます。
 
-## 構成
+## このプロジェクトの進め方
 
-- `https://global.example.com` : Nuxt ログイン画面 + Global BFF
-- `https://a.example.com` : 拠点 A BFF
-- `https://b.example.com` : 拠点 B BFF
+採用する方針は `ハイブリッド方式` です。
+
+- 普段のアプリ開発は簡易ログインで進める
+- 認証済みユーザーの受け取り口は最初から本番寄せで設計する
+- 節目ごとに Keycloak 経由の通し疎通で確認する
+
+この方針の狙いは次の 2 つです。
+
+- 認証待ちでプロトタイプ開発の速度を落とさない
+- 後から本来の認証形式へ載せ替えるコストを最小化する
+
+## 現在の検証環境
+
+このリポジトリには、認証疎通確認用の最小構成がすでにあります。
+
+- `https://global.example.com` : Nuxt の入口画面 + Global BFF
+- `https://a.example.com` : Tenant BFF A
+- `https://b.example.com` : Tenant BFF B
 - `https://keycloak.example.com` : Keycloak
-- `https://pgadmin.example.com` : pgAdmin 4
+- `https://pgadmin.example.com` : pgAdmin
 
-コンテナは次の 9 サービスです。
+サービス構成は [docker-compose.yml](/home/wsat/projects/keycloak-multi-app/docker-compose.yml) を参照してください。
 
-- `nginx`
-- `keycloak`
-- `postgres`
-- `pgadmin`
-- `backend`
-- `bff-global`
-- `bff-a`
-- `bff-b`
-- `frontend`
+実装上の役割はおおむね次の通りです。
 
-Docker ネットワークは `internal` を 1 つだけ使います。
+- `frontend/`
+  Nuxt 3 の最小入口画面。現在はログインボタン中心です。
+- `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`
+  Keycloak ログイン開始と、所属先 BFF への振り分けを担当します。
+- `laravel-overlay/app/Http/Controllers/TenantAuthController.php`
+  tenant 側の silent login、セッション生成、ログアウトを担当します。
+- `laravel-overlay/app/Http/Controllers/BackendServerController.php`
+  `sub` と AP サーバー URL の対応を返す最小 backend です。
+- `keycloak/realm-myapp.json`
+  検証用 realm 定義です。
 
-## ディレクトリ
+## 前提整理
+
+このリポジトリで今すぐ完成を目指すもの:
+
+- 新しい AP サーバーのプロトタイプ
+- 主要画面、主要 API、最低限のデータ構造
+- 認証切替に耐えるアプリ構造
+
+このリポジトリで今は作り込みすぎないもの:
+
+- Token Exchange の本実装
+- Keycloak の本番レベル運用
+- 認証方式の完全固定
+- 多 AP の複雑な接続制御
+
+## 決定事項
+
+新しい AP サーバーは次の構成で進めます。
+
+- フロントエンドは `Nuxt 4 + Nuxt UI`
+- バックエンドは `Laravel 13`
+- FRONTEND と BACKEND は同一サーバー上で稼働する
+- 新しい AP サーバーは既存の `frontend/` や `laravel-overlay/` に混ぜず、別フォルダで管理する
+
+現時点では、既存の `frontend/` と `laravel-overlay/` は `認証疎通確認用の既存環境` として維持します。
+
+## 開発方針
+
+### 1. 認証をアプリ本体に埋め込まない
+
+AP サーバー側の画面や API は、`ログイン方式` を直接知らない状態で作ります。  
+見るのは「現在のユーザー情報」だけに寄せます。
+
+想定する最小のユーザー情報例:
+
+- `sub`
+- `name`
+- `email`
+- `roles`
+- `tenant`
+
+### 2. 認証情報の受け口を 1 箇所に寄せる
+
+今後の AP サーバーでは、認証済みユーザー取得処理を 1 箇所にまとめます。
+
+例:
+
+- Laravel 側なら middleware / service / request helper
+- Nuxt 側なら composable / route middleware
+
+業務コードから直接 `session` や `token` を触る箇所を増やさないのが大事です。
+
+### 3. 開発中は簡易ログインを使う
+
+日々の画面開発・API 開発では、簡易ログインで固定ユーザーを入れて進めます。  
+ただし、簡易ログインは本番認証の代用品であって、本体の業務処理に混ぜ込まないようにします。
+
+簡易ログインの条件:
+
+- 開発環境限定で有効
+- 固定ユーザーをセッション投入できる
+- 後で無効化しやすい
+- 本番認証のユーザー形式に合わせる
+
+### 4. Keycloak 通し確認を定期的に入れる
+
+区切りのよいタイミングで、既存の SSO 環境に繋いで確認します。
+
+確認のタイミング例:
+
+- AP サーバーの認証ガードを追加したとき
+- ユーザー表示や権限制御を追加したとき
+- API 認可の入口を追加したとき
+- リリース前の結合確認時
+
+## おすすめの実装ルール
+
+AP サーバープロトタイプでは、次を守ると移行が軽くなります。
+
+- `FakeAuth` と `SsoAuth` を差し替えられる構造にする
+- コントローラに認証ロジックを書き込まない
+- 画面は `現在のユーザー` を参照するだけにする
+- API は `現在のユーザー` と `業務データ` を分けて扱う
+- 認証方式ごとの差は adapter 層で吸収する
+
+## 実装イメージ
+
+新しい AP サーバーで持ちたい構造のイメージです。
 
 ```text
-.
-├── docker-compose.yml
-├── docker/
-│   ├── env/
-│   ├── frontend/
-│   └── laravel/
-├── frontend/
-├── keycloak/
-├── laravel-overlay/
-└── nginx/
-    ├── certs/
-    └── conf.d/
+AP Server
+├── UI / API
+├── CurrentUser 取得層
+│   ├── FakeAuthProvider
+│   └── SsoAuthProvider
+└── Business Logic
 ```
 
-## 事前準備
+見え方としては次のイメージです。
 
-### 1. hosts 設定
+1. 開発中は `FakeAuthProvider` が固定ユーザーを返す
+2. SSO 確認時は `SsoAuthProvider` に切り替える
+3. UI / API / Business Logic は共通の `CurrentUser` を使う
+
+## このリポジトリでの進め方
+
+実際の開発は、次の順で進めるのがおすすめです。
+
+1. AP サーバーで必要な画面と API を決める
+2. その AP サーバーで必要な `CurrentUser` の項目を決める
+3. 簡易ログインで固定ユーザーを返す仕組みを用意する
+4. 画面・API・DB を先に作る
+5. 認証ガードの入口を追加する
+6. 既存 Keycloak 環境へ接続して通し確認する
+7. 簡易ログインを無効化しやすい状態を保つ
+
+## 直近の実装対象
+
+このリポジトリで次に着手するなら、優先順位はこの順です。
+
+1. 新しい AP サーバーのフォルダ構成を決める
+2. `Nuxt 4 + Nuxt UI` のフロントエンド雛形を作る
+3. `Laravel 13` のバックエンド雛形を作る
+4. 開発用の簡易ログインを入れる
+5. SSO 連携時のユーザー受け取り口をつなぐ
+
+## 次のチャットで始めること
+
+次の新しいチャットでは、`新しい AP サーバーの構築` から開始します。
+
+開始時の前提:
+
+- 既存の `frontend/` と `laravel-overlay/` は認証検証用として残す
+- 新しい AP サーバーは別フォルダで新規作成する
+- 構成は `Nuxt 4 + Nuxt UI + Laravel 13`
+- 開発方式は `ハイブリッド方式`
+
+## 既存認証環境の使い方
+
+現在の認証検証環境は、`定期的な結合確認用` として使います。
+
+### 起動
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+### hosts 設定
 
 Ubuntu ホストの `/etc/hosts` に追加します。
 
@@ -55,383 +201,36 @@ Ubuntu ホストの `/etc/hosts` に追加します。
 127.0.0.1 pgadmin.example.com
 ```
 
-### 2. mkcert で wildcard 証明書を作る
-
-```bash
-sudo apt update
-sudo apt install -y libnss3-tools
-curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
-chmod +x mkcert-v*-linux-amd64
-sudo mv mkcert-v*-linux-amd64 /usr/local/bin/mkcert
-
-mkcert -install
-mkcert -cert-file nginx/certs/_wildcard.example.com.pem \
-  -key-file nginx/certs/_wildcard.example.com-key.pem \
-  "*.example.com" example.com
-```
-
-証明書は nginx コンテナ内で `/etc/nginx/certs` にマウントされます。
-
-### 3. Docker / compose
-
-```bash
-docker compose version
-docker version
-```
-
-## PostgreSQL / pgAdmin 4
-
-アプリケーション用 DB として PostgreSQL を追加しています。
-
-- service: `postgres`
-- DB 名: `myapp`
-- user: `myapp`
-- password: `myapp123`
-
-Laravel 共通 env では次を設定済みです。
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=postgres
-DB_PORT=5432
-DB_DATABASE=myapp
-DB_USERNAME=myapp
-DB_PASSWORD=myapp123
-```
-
-pgAdmin 4 も Docker で起動し、nginx 経由で HTTPS アクセスできます。
-
-- URL: `https://pgadmin.example.com`
-- login email: `admin@example.com`
-- login password: `admin123`
-
-pgAdmin で PostgreSQL を登録する場合は次を使います。
-
-- Host name: `postgres`
-- Port: `5432`
-- Username: `myapp`
-- Password: `myapp123`
-
-このリポジトリでは [servers.json](/home/wsat/projects/keycloak-multi-app/pgadmin/servers.json) を pgAdmin コンテナへマウントしているため、初回ログイン時点で `myapp-postgres` が事前登録された状態になります。
-
-## 起動
-
-```bash
-docker compose build
-docker compose up -d
-```
-
-初回 `build` 時に Laravel イメージ内で `composer create-project laravel/laravel` を実行し、`laravel-overlay/` の最小コードを上書き適用します。
-
-## 起動後の確認
-
-### PostgreSQL の稼働確認
-
-まずコンテナ状態を確認します。
-
-```bash
-docker compose ps
-```
-
-PostgreSQL へ直接入る確認コマンドです。
-
-```bash
-docker compose exec postgres psql -U myapp -d myapp
-```
-
-`psql` に入れたら、次で接続確認できます。
-
-```sql
-\conninfo
-\dt
-SELECT current_database(), current_user;
-```
-
-終了は次です。
-
-```sql
-\q
-```
-
-1 コマンドで疎通だけ確認したい場合は次でも大丈夫です。
-
-```bash
-docker compose exec postgres psql -U myapp -d myapp -c "SELECT version();"
-docker compose exec postgres psql -U myapp -d myapp -c "\dt"
-```
-
-health 状態の確認:
-
-```bash
-docker compose ps
-docker inspect --format='{{json .State.Health}}' keycloak-multi-app-postgres-1
-docker inspect --format='{{json .State.Health}}' keycloak-multi-app-backend-1
-docker inspect --format='{{json .State.Health}}' keycloak-multi-app-keycloak-1
-```
-
-### pgAdmin 4 の確認
-
-1. `https://pgadmin.example.com` を開く
-2. `admin@example.com / admin123` でログインする
-3. 左ペインに `myapp-postgres` が見えることを確認する
-4. 初回接続時にパスワードを聞かれたら `myapp123` を入力する
-
-もし手動登録したい場合は次を入力します。
-
-- Name: `myapp-postgres`
-- Host name/address: `postgres`
-- Port: `5432`
-- Maintenance database: `myapp`
-- Username: `myapp`
-- Password: `myapp123`
-
-### Laravel migration の初期設定
-
-Laravel 共通 env で PostgreSQL 接続は設定済みです。
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=postgres
-DB_PORT=5432
-DB_DATABASE=myapp
-DB_USERNAME=myapp
-DB_PASSWORD=myapp123
-```
-
-初期 migration サンプルとして [2026_04_09_000000_create_route_assignments_table.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/database/migrations/2026_04_09_000000_create_route_assignments_table.php) を追加しています。管理用カラム追加は [2026_04_09_000100_add_management_columns_to_route_assignments_table.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/database/migrations/2026_04_09_000100_add_management_columns_to_route_assignments_table.php) です。初期 seed は [DatabaseSeeder.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/database/seeders/DatabaseSeeder.php) です。
-
-migration 実行はどの Laravel コンテナからでもできますが、共通 backend から実行するのが分かりやすいです。
-
-```bash
-docker compose exec backend php artisan migrate --seed --force
-```
-
-すでに旧版の `route_assignments` テーブルを作成済みでも、このまま `migrate --seed --force` で追加カラム migration が順に適用されます。
-
-状態確認:
-
-```bash
-docker compose exec backend php artisan migrate:status
-docker compose exec postgres psql -U myapp -d myapp -c "\dt"
-docker compose exec postgres psql -U myapp -d myapp -c "SELECT sub, site_code, server_url FROM route_assignments ORDER BY sub;"
-```
-
-ロールバック確認:
-
-```bash
-docker compose exec backend php artisan migrate:rollback --step=1
-docker compose exec backend php artisan migrate --seed --force
-```
-
-新しい migration を追加したいときは次を使います。
-
-```bash
-docker compose exec backend php artisan make:migration create_example_table
-```
-
-生成先は Laravel コンテナ内の `/var/www/app/database/migrations` です。今の構成ではイメージ内に展開されるため、継続的に編集したい場合は次のどちらかにすると運用しやすいです。
-
-- `laravel-overlay/database/migrations` に migration を追加して再 build する
-- Laravel アプリ全体を bind mount する構成へ切り替える
-
-## Backend の振り分けロジック
-
-backend の `/internal/users/{sub}/server` は PostgreSQL の `route_assignments` テーブルを参照するようにしています。
-
-- 既存レコードがあればそのまま返却
-- 未登録の `sub` は暫定ルールで A/B を決めて DB に保存
-- 次回以降は保存済みの所属先を返却
-
-`route_assignments` には pgAdmin で直接編集しやすい管理カラムも追加しています。
-
-- `display_name`: 管理画面で見やすい表示名
-- `is_active`: 一時停止フラグ
-- `priority`: 優先度
-- `notes`: 運用メモ
-- `last_resolved_at`: backend が最後に参照した時刻
-
-backend API と保存データの確認:
-
-```bash
-curl -k https://global.example.com/health
-curl -k https://keycloak.example.com/health/ready
-docker compose exec postgres psql -U myapp -d myapp -c "SELECT sub, site_code, server_url FROM route_assignments ORDER BY sub;"
-```
-
-### 管理 API
-
-backend には最小の管理 API を追加しています。
-
-- `GET /internal/route-assignments`
-- `POST /internal/route-assignments`
-- `PUT /internal/route-assignments/{sub}`
-- `DELETE /internal/route-assignments/{sub}`
-
-これらの管理 API には Basic 認証を付けています。初期値は [backend.env](/home/wsat/projects/keycloak-multi-app/docker/env/backend.env) に入れています。
-
-- user: `ops`
-- password: `ops12345`
-
-実運用では必ず変更してください。
-
-一覧取得:
-
-```bash
-docker compose exec backend curl -s -u ops:ops12345 http://127.0.0.1:8000/internal/route-assignments
-```
-
-新規追加:
-
-```bash
-docker compose exec backend curl -s -u ops:ops12345 -X POST http://127.0.0.1:8000/internal/route-assignments \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sub": "tenant-user-c",
-    "display_name": "Site C candidate",
-    "site_code": "A",
-    "server_url": "https://a.example.com",
-    "is_active": true,
-    "priority": 120,
-    "notes": "Created via backend management API."
-  }'
-```
-
-更新:
-
-```bash
-docker compose exec backend curl -s -u ops:ops12345 -X PUT http://127.0.0.1:8000/internal/route-assignments/tenant-user-a \
-  -H "Content-Type: application/json" \
-  -d '{
-    "display_name": "Alice updated assignment",
-    "site_code": "B",
-    "server_url": "https://b.example.com",
-    "priority": 90,
-    "notes": "Temporarily routed to site B."
-  }'
-```
-
-無効化:
-
-```bash
-docker compose exec backend curl -s -u ops:ops12345 -X PUT http://127.0.0.1:8000/internal/route-assignments/tenant-user-b \
-  -H "Content-Type: application/json" \
-  -d '{
-    "is_active": false,
-    "notes": "Disabled for maintenance."
-  }'
-```
-
-削除:
-
-```bash
-docker compose exec backend curl -i -u ops:ops12345 -X DELETE http://127.0.0.1:8000/internal/route-assignments/tenant-user-c
-```
-
-## Keycloak 設定
-
-このリポジトリには `keycloak/realm-myapp.json` を同梱してあり、起動時に自動 import します。
-
-### realm
-
-- `myapp`
-
-### clients
-
-- `global-login`
-- `app-a`
-- `app-b`
-
-### redirect URIs
-
-- `https://global.example.com/auth/callback`
-- `https://a.example.com/auth/callback`
-- `https://b.example.com/auth/callback`
-
-### issuer
-
-- `https://keycloak.example.com/realms/myapp`
-
-### 初期ログイン情報
-
-- Keycloak 管理画面: `https://keycloak.example.com`
-- admin user: `admin`
-- admin password: `admin123`
-
-### テストユーザー
-
-- `alice / password`
-- `bob / password`
-
-このサンプルでは Keycloak user id を固定しており、subject は次になります。
-
-- `alice` の `sub`: `tenant-user-a`
-- `bob` の `sub`: `tenant-user-b`
-
-そのため、末尾が `b` のユーザーは `b.example.com`、それ以外は `a.example.com` に振り分けられます。
-
-## Laravel の役割
-
-### 共通 .env
-
-全 Laravel サービスで次を共通設定しています。
-
-```env
-SESSION_DOMAIN=.example.com
-SESSION_SECURE_COOKIE=true
-SESSION_SAME_SITE=lax
-```
-
-### Global BFF
-
-- `/login` で Keycloak OIDC ログイン開始
-- `/auth/callback` で `sub` を取得
-- `backend` の `/internal/users/{sub}/server` を呼ぶ
-- `https://a.example.com/auth/silent-login` または `https://b.example.com/auth/silent-login` へ 302
-
-### 共通 Backend
-
-- `GET /internal/users/{sub}/server`
-- 仮実装として、`sub` の末尾が `b` なら B、それ以外は A
-
-### 拠点 BFF
-
-- `/auth/silent-login` で `prompt=none` を付けた Keycloak 再認証
-- `/auth/callback` で Laravel Auth セッションを作成
-- `/` でログイン済みユーザー情報を返却
-
-## Nuxt
-
-`frontend/` はログインボタンのみの最小 UI です。`https://global.example.com/login` に遷移します。
-
-## nginx
-
-`nginx/conf.d/default.conf` で 5 ドメイン分の server block をまとめて定義しています。
-
-必須ヘッダは全 proxy location に設定済みです。
-
-```nginx
-proxy_set_header Host $host;
-proxy_set_header X-Forwarded-Proto https;
-proxy_set_header X-Forwarded-For $remote_addr;
-```
-
-## 動作確認
+### SSO 確認
 
 1. `https://global.example.com` を開く
 2. `Login` を押す
 3. Keycloak でログインする
-4. backend が所属先 URL を返す
-5. `https://a.example.com` または `https://b.example.com` にリダイレクトされる
-6. Keycloak セッションを使って silent login が成功し、SSO 状態になる
+4. `a.example.com` または `b.example.com` に遷移する
+5. tenant 側でログイン済みユーザーが返ることを確認する
 
-## VS Code Remote-SSH 前提
+### ログアウト確認
 
-- Ubuntu サーバーに Remote-SSH 接続
-- このリポジトリをそのまま開く
-- 編集はローカルファイルに対して行い、起動はサーバー上で `docker compose up -d`
+1. `https://a.example.com/logout` または `https://b.example.com/logout` を開く
+2. Keycloak の logout endpoint に遷移することを確認する
+3. `https://global.example.com/` に戻ることを確認する
+
+## 参考情報
+
+現在の SSO サンプルの詳細を残したバックアップは [README.backup-2026-04-13.md](/home/wsat/projects/keycloak-multi-app/README.backup-2026-04-13.md) に保存しています。
+
+主な参照先:
+
+- [docker-compose.yml](/home/wsat/projects/keycloak-multi-app/docker-compose.yml)
+- [frontend/pages/index.vue](/home/wsat/projects/keycloak-multi-app/frontend/pages/index.vue)
+- [GlobalAuthController.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/app/Http/Controllers/GlobalAuthController.php)
+- [TenantAuthController.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/app/Http/Controllers/TenantAuthController.php)
+- [BackendServerController.php](/home/wsat/projects/keycloak-multi-app/laravel-overlay/app/Http/Controllers/BackendServerController.php)
 
 ## 補足
 
-- Keycloak は簡略化のため `start-dev` を使っています
-- 本番運用では Keycloak 用 DB、secret 管理、監査設定、healthcheck を追加してください
-- Nuxt と Laravel は最小構成です。実案件では CSRF、logout、エラーハンドリング、監視を補ってください
+- 現在の `frontend/` は Nuxt 3 です
+- 現在の Laravel ベースは 11 系です
+- この README は `AP サーバープロトタイプ開発の進め方` を主眼に再構成しています
+- 認証基盤の詳細な検証手順は必要に応じてバックアップ README を参照してください
+- 新しい AP サーバーはこれとは別系統で `Nuxt 4 + Nuxt UI + Laravel 13` で構築します

@@ -27,10 +27,12 @@ if ($role === 'backend') {
 if ($role === 'global-bff') {
     Route::get('/login', [GlobalAuthController::class, 'login']);
     Route::get('/auth/callback', [GlobalAuthController::class, 'callback']);
+    Route::get('/logout', [GlobalAuthController::class, 'logout']);
 }
 
 if (in_array($role, ['bff-a', 'bff-b'], true)) {
     Route::get('/auth/silent-login', [TenantAuthController::class, 'silentLogin']);
     Route::get('/auth/callback', [TenantAuthController::class, 'callback']);
+    Route::get('/logout', [TenantAuthController::class, 'logout']);
     Route::get('/', [TenantAuthController::class, 'home']);
 }

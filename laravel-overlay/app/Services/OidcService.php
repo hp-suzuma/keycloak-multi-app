@@ -66,6 +66,26 @@ class OidcService
         return $payload;
     }
 
+    public function logoutUrl(
+        string $postLogoutRedirectUri,
+        ?string $idTokenHint = null,
+        ?string $clientId = null,
+    ): string {
+        $query = [
+            'post_logout_redirect_uri' => $postLogoutRedirectUri,
+        ];
+
+        if ($idTokenHint) {
+            $query['id_token_hint'] = $idTokenHint;
+        }
+
+        if ($clientId) {
+            $query['client_id'] = $clientId;
+        }
+
+        return $this->publicBase().'/protocol/openid-connect/logout?'.http_build_query($query);
+    }
+
     private function publicBase(): string
     {
         return rtrim(config('services.keycloak.issuer'), '/');

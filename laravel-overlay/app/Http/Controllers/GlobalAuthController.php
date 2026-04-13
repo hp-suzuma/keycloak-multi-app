@@ -44,6 +44,7 @@ class GlobalAuthController extends Controller
 
         $claims = $this->oidc->decodeIdToken($tokens['id_token'] ?? null);
         $sub = $claims['sub'] ?? abort(500, 'sub claim is missing.');
+        $request->session()->put('oidc_id_token', $tokens['id_token'] ?? null);
 
         $response = Http::acceptJson()->get(
             rtrim(env('BACKEND_URL'), '/').'/internal/users/'.$sub.'/server'
@@ -52,5 +53,19 @@ class GlobalAuthController extends Controller
         $target = rtrim($response['server_url'], '/').'/auth/silent-login';
 
         return redirect()->away($target);
+    }
+
+    public function logout(Request $request): RedirectResponse
+    {
+        $idTokenHint = $request->session()->get('oidc_id_token');
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->away($this->oidc->logoutUrl(
+            postLogoutRedirectUri: rtrim(config('app.url'), '/').'/',
+            idTokenHint: $idTokenHint,
+            clientId: config('services.keycloak.client_id'),
+        ));
     }
 }

@@ -15,6 +15,9 @@
       "publicClient": false,
       "secret": "global-secret",
       "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://global.example.com/*"
+      },
       "redirectUris": [
         "https://global.example.com/auth/callback"
       ],
@@ -31,6 +34,9 @@
       "publicClient": false,
       "secret": "app-a-secret",
       "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://global.example.com/*"
+      },
       "redirectUris": [
         "https://a.example.com/auth/callback"
       ],
@@ -47,6 +53,9 @@
       "publicClient": false,
       "secret": "app-b-secret",
       "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://global.example.com/*"
+      },
       "redirectUris": [
         "https://b.example.com/auth/callback"
       ],

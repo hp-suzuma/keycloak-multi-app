@@ -54,6 +54,7 @@ class TenantAuthController extends Controller
         $user = SsoUser::fromClaims($claims);
 
         $this->users->storeUser($user);
+        $request->session()->put('oidc_id_token', $tokens['id_token'] ?? null);
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
@@ -71,7 +72,29 @@ class TenantAuthController extends Controller
         return response()->json([
             'message' => 'SSO login completed.',
             'app_role' => env('APP_ROLE'),
+            'logout_url' => rtrim(config('app.url'), '/').'/logout',
             'user' => $user->toArray(),
         ]);
+    }
+
+    public function logout(Request $request): RedirectResponse
+    {
+        $idTokenHint = $request->session()->get('oidc_id_token');
+
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->away($this->oidc->logoutUrl(
+            postLogoutRedirectUri: $this->globalPortalUrl(),
+            idTokenHint: $idTokenHint,
+            clientId: config('services.keycloak.client_id'),
+        ));
+    }
+
+    private function globalPortalUrl(): string
+    {
+        return preg_replace('#/login/?$#', '/', rtrim((string) env('GLOBAL_LOGIN_URL', 'https://global.example.com/login'), '/'))
+            ?: 'https://global.example.com/';
     }
 }
