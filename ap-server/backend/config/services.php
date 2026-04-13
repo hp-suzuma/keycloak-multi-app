@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'keycloak' => [
+        'issuer' => env('KEYCLOAK_ISSUER'),
+        'client_id' => env('KEYCLOAK_CLIENT_ID'),
+        'public_key' => env('KEYCLOAK_PUBLIC_KEY'),
+        'jwks_url' => env('KEYCLOAK_JWKS_URL'),
+        'jwks_cache_ttl' => env('KEYCLOAK_JWKS_CACHE_TTL', 300),
+        'discovery_cache_ttl' => env('KEYCLOAK_DISCOVERY_CACHE_TTL', 300),
+    ],
+
 ];

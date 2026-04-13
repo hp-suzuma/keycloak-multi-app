@@ -1,106 +1,46 @@
 # AGENTS.md
 
-## ■ Project Overview
-This project is a web application using:
-- Frontend: Nuxt 3
-- Backend: Laravel 13
-- Auth: JWT (planned migration to Keycloak SSO)
+## 目的
 
----
+このファイルは、チャットが切り替わっても開発方針や決定事項がぶれないようにするための運用ルールを定義する。
 
-## ■ Tech Stack
-- Node.js / npm
-- PHP 8.x / Laravel
-- Docker (required)
-- MySQL
+## 基本方針
 
----
+- 既存コードの流儀に合わせて最小差分で変更する
+- 将来の拡張を見越した判断をした場合は、その判断理由とあわせて記録する
+- 引継ぎに必要な情報は、会話だけに閉じず、必ずリポジトリ内に残す
 
-## ■ Directory Structure
-- frontend/ → Nuxt
-- backend/ → Laravel
-- docker/ → container config
+## 引継ぎ記録ルール
 
----
+- 方針変更が発生した場合は記録する
+- 採用した案と不採用にした案がある場合は記録する
+- API の契約、認証方針、責務分離、ディレクトリ方針など、次の実装判断に影響する内容は記録する
+- 「次のチャットで前提として扱ってほしい内容」が発生した場合は記録する
+- 一時的な調査メモではなく、今後も参照価値がある内容だけを残す
 
-## ■ Dev Commands
+## 記録先ルール
 
-### Frontend
-- dev: `npm run dev`
-- build: `npm run build`
+- まず対象ディレクトリ直下の `README.md` に記録する
+- プロジェクト全体に効く運用ルールは、このルート `AGENTS.md` に記録する
+- サブシステム固有の設計判断は、そのサブシステム配下の `README.md` に記録する
 
-### Backend
-- start: `php artisan serve`
-- test: `php artisan test`
+## 記録内容の最小要件
 
-### Docker
-- start: `docker compose up -d`
-- exec: `docker exec -it app bash`
+記録には少なくとも次を含めること。
 
----
+- 背景: なぜその判断が必要だったか
+- 決定事項: 何を採用したか
+- 影響範囲: どこに効く話か
+- 次の推奨アクション: 次工程で何を進めるべきか
 
-## ■ Coding Rules
+## 作業時ルール
 
-### General
-- Follow existing code style strictly
-- Do NOT introduce new frameworks
-- Keep changes minimal (diff-based)
+- 実装とあわせて、必要な引継ぎ記録も同じ作業の中で更新する
+- 方針や決定事項が増えたのに記録が無い状態で作業を終えない
+- 最終回答では、更新した記録ファイルを明示する
+- 新しいチャットへ移る場合は、次に参照すべきファイルを案内する
 
-### Laravel
-- Use FormRequest for validation
-- Use Service layer for business logic
-- Do NOT put logic in Controller
+## このリポジトリでの現時点の運用
 
-### Nuxt
-- Use composables for API calls
-- Do NOT duplicate API logic
-- Use TypeScript where possible
-
----
-
-## ■ Testing Rules
-- All changes must pass existing tests
-- Add tests for new features
-- Do not remove tests
-
----
-
-## ■ Security Rules
-- NEVER output secrets
-- Do NOT log tokens/passwords
-- Validate all inputs
-
----
-
-## ■ Git Rules
-- Small commits only
-- One feature per PR
-- Commit message format:
-  feat: xxx
-  fix: xxx
-
----
-
-## ■ AI Agent Behavior
-
-- Always:
-  1. Understand the goal
-  2. Identify affected files
-  3. Propose minimal changes
-
-- Before coding:
-  - Explain plan in bullet points
-
-- When coding:
-  - Modify only necessary files
-  - Follow existing patterns
-
-- After coding:
-  - Ensure build/test passes
-
----
-
-## ■ Forbidden
-- Large refactors without instruction
-- Changing architecture
-- Adding dependencies without reason
+- `ap-server/backend` の API 方針や認証まわりの引継ぎは `ap-server/backend/README.md` に記録する
+- 今後 `ap-server/frontend` や他ディレクトリでも同様の判断が出た場合は、そのディレクトリの `README.md` に記録する
