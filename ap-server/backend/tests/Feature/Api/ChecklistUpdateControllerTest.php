@@ -3,7 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\ApUser;
-use App\Models\Playbook;
+use App\Models\Checklist;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
@@ -13,76 +13,76 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class PlaybookUpdateControllerTest extends AuthorizationApiTestCase
+class ChecklistUpdateControllerTest extends AuthorizationApiTestCase
 {
     use RefreshDatabase;
 
-    public function test_it_updates_a_playbook_when_the_scope_is_accessible(): void
+    public function test_it_updates_a_checklist_when_the_scope_is_accessible(): void
     {
-        $scope = $this->assignRole('keycloak-user-playbook-update', 'tenant_operator');
+        $scope = $this->assignRole('keycloak-user-checklist-update', 'tenant_operator');
 
-        $playbook = Playbook::query()->create([
+        $checklist = Checklist::query()->create([
             'scope_id' => $scope->id,
-            'code' => 'playbook-a',
-            'name' => 'Playbook A',
+            'code' => 'checklist-a',
+            'name' => 'Checklist A',
         ]);
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-update'))
-            ->patchJson('/api/playbooks/'.$playbook->id, [
-                'code' => ' Updated_Playbook ',
-                'name' => 'Updated Playbook',
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-update'))
+            ->patchJson('/api/checklists/'.$checklist->id, [
+                'code' => ' Updated_Checklist ',
+                'name' => 'Updated Checklist',
             ]);
 
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $playbook->id,
+                    'id' => $checklist->id,
                     'scope_id' => $scope->id,
-                    'code' => 'updated-playbook',
-                    'name' => 'Updated Playbook',
+                    'code' => 'updated-checklist',
+                    'name' => 'Updated Checklist',
                 ],
             ]);
     }
 
-    public function test_it_moves_the_playbook_when_the_user_can_update_current_scope_and_create_in_target_scope(): void
+    public function test_it_moves_the_checklist_when_the_user_can_update_current_scope_and_create_in_target_scope(): void
     {
         $currentScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-current',
-            'name' => 'Tenant Current',
+            'code' => 'tenant-checklist-current',
+            'name' => 'Tenant Checklist Current',
         ]);
         $targetScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-target',
-            'name' => 'Tenant Target',
+            'code' => 'tenant-checklist-target',
+            'name' => 'Tenant Checklist Target',
         ]);
 
-        $this->assignRole('keycloak-user-playbook-move', 'tenant_operator', $currentScope);
-        $this->assignRole('keycloak-user-playbook-move', 'tenant_admin', $targetScope);
+        $this->assignRole('keycloak-user-checklist-move', 'tenant_operator', $currentScope);
+        $this->assignRole('keycloak-user-checklist-move', 'tenant_admin', $targetScope);
 
-        $playbook = Playbook::query()->create([
+        $checklist = Checklist::query()->create([
             'scope_id' => $currentScope->id,
-            'code' => 'playbook-a',
-            'name' => 'Playbook A',
+            'code' => 'checklist-a',
+            'name' => 'Checklist A',
         ]);
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-move'))
-            ->patchJson('/api/playbooks/'.$playbook->id, [
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-move'))
+            ->patchJson('/api/checklists/'.$checklist->id, [
                 'scope_id' => $targetScope->id,
-                'name' => 'Moved Playbook',
+                'name' => 'Moved Checklist',
             ]);
 
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $playbook->id,
+                    'id' => $checklist->id,
                     'scope_id' => $targetScope->id,
-                    'code' => 'playbook-a',
-                    'name' => 'Moved Playbook',
+                    'code' => 'checklist-a',
+                    'name' => 'Moved Checklist',
                 ],
             ]);
     }

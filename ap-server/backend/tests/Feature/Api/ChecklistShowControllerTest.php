@@ -3,7 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\ApUser;
-use App\Models\Policy;
+use App\Models\Checklist;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
@@ -13,25 +13,34 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class PolicyDeleteControllerTest extends AuthorizationApiTestCase
+class ChecklistShowControllerTest extends AuthorizationApiTestCase
 {
     use RefreshDatabase;
 
-    public function test_it_deletes_the_policy_when_the_scope_is_accessible(): void
+    public function test_it_returns_the_checklist_when_the_scope_is_accessible(): void
     {
-        $scope = $this->assignRole('keycloak-user-policy-delete', 'tenant_admin');
+        $scope = $this->assignRole('keycloak-user-checklist-show', 'tenant_viewer');
 
-        $policy = Policy::query()->create([
+        $checklist = Checklist::query()->create([
             'scope_id' => $scope->id,
-            'code' => 'policy-a',
-            'name' => 'Policy A',
+            'code' => 'tenant-checklist',
+            'name' => 'Tenant Checklist',
         ]);
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-delete'))
-            ->deleteJson('/api/policies/'.$policy->id);
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-show'))
+            ->getJson('/api/checklists/'.$checklist->id);
 
-        $response->assertNoContent();
+        $response
+            ->assertOk()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $checklist->id,
+                    'scope_id' => $scope->id,
+                    'code' => 'tenant-checklist',
+                    'name' => 'Tenant Checklist',
+                ],
+            ]);
     }
 
     private function assignRole(string $keycloakSub, string $roleSlug, ?Scope $scope = null): Scope

@@ -3,24 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\StoreScopedResourceRequest;
+use App\Http\Requests\Api\UpdateScopedResourceRequest;
 use App\Services\Auth\CurrentUserResolver;
-use App\Services\Object\ObjectStoreService;
+use App\Services\Checklist\ChecklistUpdateService;
 use Illuminate\Http\JsonResponse;
 
-class ObjectStoreController extends Controller
+class ChecklistUpdateController extends Controller
 {
     public function __invoke(
-        StoreScopedResourceRequest $request,
-        ObjectStoreService $objectStoreService,
+        UpdateScopedResourceRequest $request,
+        int $checklistId,
+        ChecklistUpdateService $checklistUpdateService,
         CurrentUserResolver $currentUserResolver,
     ): JsonResponse {
         return response()->json(
-            $objectStoreService->buildResponse(
+            $checklistUpdateService->buildResponse(
                 $currentUserResolver->resolve(),
+                $checklistId,
                 $request->validated(),
             ),
-            JsonResponse::HTTP_CREATED,
         );
     }
 }

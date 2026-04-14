@@ -3,6 +3,11 @@
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MeAuthorizationController;
 use App\Http\Controllers\Api\MeController;
+use App\Http\Controllers\Api\ChecklistDeleteController;
+use App\Http\Controllers\Api\ChecklistIndexController;
+use App\Http\Controllers\Api\ChecklistShowController;
+use App\Http\Controllers\Api\ChecklistStoreController;
+use App\Http\Controllers\Api\ChecklistUpdateController;
 use App\Http\Controllers\Api\ObjectIndexController;
 use App\Http\Controllers\Api\ObjectStoreController;
 use App\Http\Controllers\Api\ObjectShowController;
@@ -35,30 +40,45 @@ Route::get('/playbooks', PlaybookIndexController::class)
 Route::get('/policies', PolicyIndexController::class)
     ->middleware('required_permissions:object.read')
     ->name('api.policies.index');
+Route::get('/checklists', ChecklistIndexController::class)
+    ->middleware('required_permissions:object.read')
+    ->name('api.checklists.index');
 Route::post('/playbooks', PlaybookStoreController::class)
     ->middleware('required_permissions:object.create')
     ->name('api.playbooks.store');
 Route::post('/policies', PolicyStoreController::class)
     ->middleware('required_permissions:object.create')
     ->name('api.policies.store');
+Route::post('/checklists', ChecklistStoreController::class)
+    ->middleware('required_permissions:object.create')
+    ->name('api.checklists.store');
 Route::get('/playbooks/{playbookId}', PlaybookShowController::class)
     ->middleware('required_permissions:object.read')
     ->name('api.playbooks.show');
 Route::get('/policies/{policyId}', PolicyShowController::class)
     ->middleware('required_permissions:object.read')
     ->name('api.policies.show');
+Route::get('/checklists/{checklistId}', ChecklistShowController::class)
+    ->middleware('required_permissions:object.read')
+    ->name('api.checklists.show');
 Route::patch('/playbooks/{playbookId}', PlaybookUpdateController::class)
     ->middleware('required_permissions:object.update')
     ->name('api.playbooks.update');
 Route::patch('/policies/{policyId}', PolicyUpdateController::class)
     ->middleware('required_permissions:object.update')
     ->name('api.policies.update');
+Route::patch('/checklists/{checklistId}', ChecklistUpdateController::class)
+    ->middleware('required_permissions:object.update')
+    ->name('api.checklists.update');
 Route::delete('/playbooks/{playbookId}', PlaybookDeleteController::class)
     ->middleware('required_permissions:object.delete')
     ->name('api.playbooks.destroy');
 Route::delete('/policies/{policyId}', PolicyDeleteController::class)
     ->middleware('required_permissions:object.delete')
     ->name('api.policies.destroy');
+Route::delete('/checklists/{checklistId}', ChecklistDeleteController::class)
+    ->middleware('required_permissions:object.delete')
+    ->name('api.checklists.destroy');
 Route::post('/objects', ObjectStoreController::class)
     ->middleware('required_permissions:object.create')
     ->name('api.objects.store');

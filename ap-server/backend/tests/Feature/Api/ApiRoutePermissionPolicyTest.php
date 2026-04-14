@@ -27,6 +27,11 @@ class ApiRoutePermissionPolicyTest extends TestCase
         $this->assertRouteRequiresPermissions('api.policies.show', 'required_permissions:object.read');
         $this->assertRouteRequiresPermissions('api.policies.update', 'required_permissions:object.update');
         $this->assertRouteRequiresPermissions('api.policies.destroy', 'required_permissions:object.delete');
+        $this->assertRouteRequiresPermissions('api.checklists.index', 'required_permissions:object.read');
+        $this->assertRouteRequiresPermissions('api.checklists.store', 'required_permissions:object.create');
+        $this->assertRouteRequiresPermissions('api.checklists.show', 'required_permissions:object.read');
+        $this->assertRouteRequiresPermissions('api.checklists.update', 'required_permissions:object.update');
+        $this->assertRouteRequiresPermissions('api.checklists.destroy', 'required_permissions:object.delete');
         $this->assertRouteRequiresPermissions('api.objects.store', 'required_permissions:object.create');
         $this->assertRouteRequiresPermissions('api.objects.show', 'required_permissions:object.read');
         $this->assertRouteRequiresPermissions('api.objects.update', 'required_permissions:object.update');

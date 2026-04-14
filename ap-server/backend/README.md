@@ -283,6 +283,10 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 
 `policies` の一覧 endpoint です。`required_permissions:object.read` を必須にし、`objects` / `playbooks` と同じく `AuthorizationService` で確定した閲覧可能 scope 配下だけを対象に filter / sort / pagination を適用します。
 
+### `GET /api/checklists`
+
+`checklists` の一覧 endpoint です。`required_permissions:object.read` を必須にし、`objects` / `playbooks` / `policies` と同じく `AuthorizationService` で確定した閲覧可能 scope 配下だけを対象に filter / sort / pagination を適用します。
+
 ### `GET /api/policies/{id}`
 
 `policies` の詳細取得 endpoint です。route では `required_permissions:object.read` を必須にし、service では対象 policy の `scope_id` に対して `canAccessScope(..., 'object.read', $scopeId)` を使って判定します。
@@ -293,11 +297,27 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 
 ### `PATCH /api/policies/{id}`
 
-`policies` の更新 endpoint です。route では `required_permissions:object.update` を必須にし、service では対象 policy の `scope_id` に対して `canAccessScope(..., 'object.update', $scopeId)` を使って更新可否を判定します。
+`policies` の更新 endpoint です。route では `required_permissions:object.update` を必須にし、service では対象 policy の `scope_id` に対して `canAccessScope(..., 'object.update', $scopeId)` を使って更新可否を判定します。`scope_id` の変更は許可せず、作成後の policy は同一 scope に固定します。
 
 ### `DELETE /api/policies/{id}`
 
 `policies` の削除 endpoint です。route では `required_permissions:object.delete` を必須にし、service では対象 policy の `scope_id` に対して `canAccessScope(..., 'object.delete', $scopeId)` を使って削除可否を判定します。成功時は `204 No Content` を返します。
+
+### `GET /api/checklists/{id}`
+
+`checklists` の詳細取得 endpoint です。route では `required_permissions:object.read` を必須にし、service では対象 checklist の `scope_id` に対して `canAccessScope(..., 'object.read', $scopeId)` を使って判定します。
+
+### `POST /api/checklists`
+
+`checklists` の新規作成 endpoint です。route では `required_permissions:object.create` を必須にし、入力された `scope_id` に対して `canAccessScope(..., 'object.create', $scopeId)` を使って作成可否を判定します。`code` は既存 resource と同じ正規化ルールを使い、正規化後の `scope_id + code` が重複する場合は `422 Unprocessable Entity` を返します。
+
+### `PATCH /api/checklists/{id}`
+
+`checklists` の更新 endpoint です。route では `required_permissions:object.update` を必須にし、service では対象 checklist の `scope_id` に対して `canAccessScope(..., 'object.update', $scopeId)` を使って更新可否を判定します。`scope_id` を変更する場合は、現在の scope に対する `object.update` に加えて、移動先 `scope_id` に対する `object.create` も必要です。
+
+### `DELETE /api/checklists/{id}`
+
+`checklists` の削除 endpoint です。route では `required_permissions:object.delete` を必須にし、service では対象 checklist の `scope_id` に対して `canAccessScope(..., 'object.delete', $scopeId)` を使って削除可否を判定します。成功時は `204 No Content` を返します。
 
 ### `GET /api/objects/{id}`
 
@@ -398,18 +418,33 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 - `GET /api/policies`
   - required permissions: `object.read`
   - 理由: policies の一覧でも route で read permission を明示し、返却対象と filter / sort の適用範囲を閲覧可能 scope 配下へ限定するため
+- `GET /api/checklists`
+  - required permissions: `object.read`
+  - 理由: checklists の一覧でも route で read permission を明示し、返却対象と filter / sort の適用範囲を閲覧可能 scope 配下へ限定するため
 - `GET /api/policies/{id}`
   - required permissions: `object.read`
   - 理由: policies の詳細取得でも route で read permission を明示し、対象 record の `scope_id` に対する追加認可を service 側で行うため
+- `GET /api/checklists/{id}`
+  - required permissions: `object.read`
+  - 理由: checklists の詳細取得でも route で read permission を明示し、対象 record の `scope_id` に対する追加認可を service 側で行うため
 - `POST /api/policies`
   - required permissions: `object.create`
   - 理由: policies の作成でも route で create permission を明示し、入力された `scope_id` に対する追加認可を service 側で行うため
+- `POST /api/checklists`
+  - required permissions: `object.create`
+  - 理由: checklists の作成でも route で create permission を明示し、入力された `scope_id` に対する追加認可を service 側で行うため
 - `PATCH /api/policies/{id}`
   - required permissions: `object.update`
   - 理由: policies の更新でも route で update permission を明示し、対象 record の `scope_id` に対する追加認可を service 側で行うため
+- `PATCH /api/checklists/{id}`
+  - required permissions: `object.update`
+  - 理由: checklists の更新でも route で update permission を明示し、対象 record の `scope_id` と必要に応じて移動先 `scope_id` に対する追加認可を service 側で行うため
 - `DELETE /api/policies/{id}`
   - required permissions: `object.delete`
   - 理由: policies の削除でも route で delete permission を明示し、対象 record の `scope_id` に対する追加認可を service 側で行うため
+- `DELETE /api/checklists/{id}`
+  - required permissions: `object.delete`
+  - 理由: checklists の削除でも route で delete permission を明示し、対象 record の `scope_id` に対する追加認可を service 側で行うため
 - `GET /api/objects/{id}`
   - required permissions: `object.read`
   - 理由: 詳細取得でも route で read permission を明示したうえで、対象 object の `scope_id` に対する追加認可を service 側で行うため
@@ -518,7 +553,36 @@ Route::get('/objects', ObjectIndexController::class)
 - 背景: objects / playbooks の CRUD を並べると、controller や service の流れは似ていても payload 形状や正規化の有無まで完全共通化すると逆に読みづらくなる懸念があった
 - 決定事項: 共通化は `app/Services/Resource/ScopedIndexQueryService.php`、`AuthorizedScopedResourceService.php`、`ScopedCodeUniquenessService.php` の 3 点に留め、resource 固有 service は payload 変換や入力解釈を担当する
 - 影響範囲: `app/Services/Resource/*`、`app/Services/Object/*`、`app/Services/Playbook/*`
+- 次の推奨アクション: controller/request validation を共通化する場合も、まずは `scope_id` / `code` / `name` の型や必須性のような入力スキーマだけに留め、resource 固有ルールは service に残す
+
+### `policy` は作成後に scope を変更しない
+
+- 背景: service 層の共通化が終わった段階で request validation まで一気に共通化すると、resource ごとの業務ルールが後から入りづらくなる懸念があった
+- 決定事項: 差分確認のため `policy` には「作成後に `scope_id` を変更できない」業務ルールを追加し、`PATCH /api/policies/{id}` で別 scope への移動要求が来た場合は `422 Unprocessable Entity` を返す。`scope_id` の型や存在確認は controller validation に残し、resource 固有ルールは `PolicyUpdateService` で判定する
+- 影響範囲: `app/Services/Policy/PolicyUpdateService.php`、`tests/Feature/Api/PolicyUpdateControllerTest.php`
+- 次の推奨アクション: 次に controller 側を共通化する場合は「入力フォーマット共通化」に限定し、移動可否や状態遷移のような resource 固有ルールは service へ残す方針で他 resource にも当てはまるかを確認する
 - 次の推奨アクション: 3 つ目の resource を追加した時点で、payload や create/update の共通化まで本当に必要かをあらためて見直す
+
+### controller/request validation の共通化は入力スキーマまでに留める
+
+- 背景: `objects` / `playbooks` / `policies` の store/update controller では `scope_id` / `code` / `name` の validation が重複していたが、前段で `policy` だけ移動不可の業務ルールを追加したことで、validation と業務判定を混ぜない境界を保つ必要がはっきりした
+- 決定事項: 共通 request として `StoreScopedResourceRequest` と `UpdateScopedResourceRequest` を追加し、controller は共通の入力スキーマだけを受け持つ。resource 固有ルールや状態遷移制約は引き続き各 service で判定する
+- 影響範囲: `app/Http/Requests/Api/StoreScopedResourceRequest.php`、`app/Http/Requests/Api/UpdateScopedResourceRequest.php`、`app/Http/Controllers/Api/*StoreController.php`、`app/Http/Controllers/Api/*UpdateController.php`
+- 次の推奨アクション: 次に request 共通化を広げる場合は、resource 固有の追加項目が出たときに「共通 request の継承で足せるか」を見る。共通 request 自体へ業務ルールを押し込まない
+
+### index controller の query validation も共通 request に寄せる
+
+- 背景: 4 resource まで増えた時点で index controller には `scope_id` / `code` / `name` / `sort` / `page` / `per_page` の validation と数値キャストが同じ形で並び、HTTP 層の補助ロジックだけが重複していた
+- 決定事項: `IndexScopedResourceRequest` を追加し、index controller は query validation と `scope_id` / `page` / `per_page` の数値正規化をこの request に委譲する。resource ごとの差分は引き続き index service 側の model 指定に留める
+- 影響範囲: `app/Http/Requests/Api/IndexScopedResourceRequest.php`、`app/Http/Controllers/Api/*IndexController.php`
+- 次の推奨アクション: 次に横断共通化を進めるなら、feature test に重複している Keycloak JWT セットアップを trait や helper に寄せ、resource ごとのテスト本体は認可と payload の差分だけに集中させる
+
+### Keycloak JWT の test セットアップは trait と base test に寄せる
+
+- 背景: API feature test が増えるにつれて、RSA 鍵生成、JWKS 偽装、Bearer トークン生成、AuthorizationSeeder の投入が各 test class に繰り返し現れ、resource 本体の差分が見えにくくなっていた
+- 決定事項: Keycloak 用の共通 helper は `tests/Concerns/InteractsWithKeycloakTokens.php` に寄せ、API test 用の base class として `tests/Feature/Api/KeycloakApiTestCase.php`、`tests/Feature/Api/AuthorizationApiTestCase.php` を追加する。resource 系や認可系の feature test はこれらを継承し、各 class には業務シナリオ固有の setup だけを残す
+- 影響範囲: `tests/Concerns/InteractsWithKeycloakTokens.php`、`tests/Feature/Api/KeycloakApiTestCase.php`、`tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Api/*Test.php`
+- 次の推奨アクション: 次に test 共通化を進めるなら、`assignRole()` や fixture 作成の重複を resource 横断でまとめるのではなく、まずは JWT 以外でも完全一致している補助処理だけを trait 化する
 
 ### 3 つ目の resource `policies` でも同じ共通化境界で成立することを確認
 
@@ -526,6 +590,13 @@ Route::get('/objects', ObjectIndexController::class)
 - 決定事項: `policies` を 3 つ目の CRUD resource として追加し、一覧は `ScopedIndexQueryService`、単体取得は `AuthorizedScopedResourceService`、`scope_id + code` の一意性は `ScopedCodeUniquenessService` を再利用する構成で実装した
 - 影響範囲: `database/migrations/2026_04_14_000002_create_policies_table.php`、`app/Models/Policy.php`、`app/Http/Controllers/Api/Policy*Controller.php`、`app/Services/Policy/*`、`routes/api.php`、`tests/Feature/Api/Policy*Test.php`
 - 次の推奨アクション: ここまでで共通化境界は十分安定しているため、次に共通化を広げるなら controller request validation や payload 変換ではなく、resource ごとの業務ルール差分が出てから必要性を見て判断する
+
+### 4 つ目の resource `checklists` でも同じ共通化境界を維持する
+
+- 背景: 3 resource までは同じ構成で実装できても、4 本目で controller/request 共通化や resource service の責務分割が崩れるなら、まだ境界が固定しきれていない可能性があった
+- 決定事項: `checklists` を 4 つ目の CRUD resource として追加し、一覧は `ScopedIndexQueryService`、単体取得は `AuthorizedScopedResourceService`、`scope_id + code` の一意性は `ScopedCodeUniquenessService`、store/update の入力は `StoreScopedResourceRequest` / `UpdateScopedResourceRequest` をそのまま再利用する構成で実装した
+- 影響範囲: `database/migrations/2026_04_14_000003_create_checklists_table.php`、`app/Models/Checklist.php`、`app/Http/Controllers/Api/Checklist*Controller.php`、`app/Services/Checklist/*`、`routes/api.php`、`tests/Feature/Api/Checklist*Test.php`
+- 次の推奨アクション: 次に見直すなら CRUD resource の追加ではなく、index controller の query validation や JWT テストセットアップのように、4 resource で同じ形を保っている補助層に横断的な共通化余地があるかを確認する
 
 ## コンテナでの作業
 

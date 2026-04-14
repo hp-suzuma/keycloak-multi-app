@@ -3,7 +3,6 @@
 namespace App\Services\Policy;
 
 use App\Services\Auth\CurrentUser;
-use App\Services\Object\EnsureAuthorizedScope;
 use App\Services\Object\ObjectCodeNormalizer;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +11,6 @@ class PolicyUpdateService
 {
     public function __construct(
         private readonly FindAuthorizedPolicy $findAuthorizedPolicy,
-        private readonly EnsureAuthorizedScope $ensureAuthorizedScope,
         private readonly EnsureUniquePolicyCode $ensureUniquePolicyCode,
         private readonly ObjectCodeNormalizer $objectCodeNormalizer,
     ) {
@@ -37,7 +35,12 @@ class PolicyUpdateService
             ->resolve($currentUser, $policyId, 'object.update');
 
         if (isset($attributes['scope_id']) && $attributes['scope_id'] !== $policy->scope_id) {
-            $this->ensureAuthorizedScope->ensure($currentUser, $attributes['scope_id'], 'object.create');
+            throw new HttpResponseException(response()->json([
+                'message' => 'Validation failed',
+                'errors' => [
+                    'scope_id' => ['Policy scope cannot be changed after creation.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY));
         }
 
         $nextScopeId = $attributes['scope_id'] ?? $policy->scope_id;

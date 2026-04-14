@@ -7,85 +7,11 @@ use App\Models\ManagedObject;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
-use Database\Seeders\AuthorizationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
 
-class ObjectUpdateControllerTest extends TestCase
+class ObjectUpdateControllerTest extends AuthorizationApiTestCase
 {
     use RefreshDatabase;
-
-    private string $keycloakPrivateKey;
-
-    /**
-     * @var array<string, mixed>
-     */
-    private array $keycloakPublicKeyDetails;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $keyPair = openssl_pkey_new([
-            'private_key_bits' => 2048,
-            'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
-
-        if ($keyPair === false) {
-            $this->fail('Failed to generate RSA key pair for Keycloak token tests.');
-        }
-
-        openssl_pkey_export($keyPair, $privateKey);
-        $details = openssl_pkey_get_details($keyPair);
-
-        if ($privateKey === false || ! is_array($details) || ! isset($details['key'])) {
-            $this->fail('Failed to export RSA key pair for Keycloak token tests.');
-        }
-
-        $this->keycloakPrivateKey = $privateKey;
-        $this->keycloakPublicKeyDetails = $details;
-
-        config()->set('services.keycloak.issuer', 'https://sso.example.com/realms/ap');
-        config()->set('services.keycloak.client_id', 'ap-frontend');
-        config()->set('services.keycloak.public_key', null);
-        config()->set('services.keycloak.jwks_cache_ttl', 300);
-        config()->set('services.keycloak.discovery_cache_ttl', 300);
-
-        Http::preventStrayRequests();
-        $this->fakeJwks('https://sso.example.com/realms/ap/protocol/openid-connect/certs', [
-            $this->buildJwk('keycloak-kid-1', $details),
-        ]);
-
-        $this->seed(AuthorizationSeeder::class);
-    }
-
-    public function test_it_requires_the_object_update_permission(): void
-    {
-        $scope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-a',
-            'name' => 'Tenant A',
-        ]);
-
-        $managedObject = ManagedObject::query()->create([
-            'scope_id' => $scope->id,
-            'code' => 'object-a',
-            'name' => 'Object A',
-        ]);
-
-        $response = $this->patchJson('/api/objects/'.$managedObject->id, [
-            'name' => 'Updated Object A',
-        ]);
-
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.update'],
-            ]);
-    }
 
     public function test_it_returns_validation_errors_for_invalid_payloads(): void
     {
@@ -369,79 +295,4 @@ class ObjectUpdateControllerTest extends TestCase
         return $scope;
     }
 
-    private function buildAccessToken(string $subject): string
-    {
-        return $this->buildJwt([
-            'iss' => 'https://sso.example.com/realms/ap',
-            'sub' => $subject,
-            'aud' => ['ap-frontend'],
-            'preferred_username' => $subject,
-            'email' => $subject.'@example.com',
-            'exp' => now()->addMinutes(5)->timestamp,
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function buildJwt(array $payload): string
-    {
-        $header = ['alg' => 'RS256', 'typ' => 'JWT', 'kid' => 'keycloak-kid-1'];
-        $encodedHeader = $this->base64UrlEncode(json_encode($header, JSON_THROW_ON_ERROR));
-        $encodedPayload = $this->base64UrlEncode(json_encode($payload, JSON_THROW_ON_ERROR));
-        $signedPart = $encodedHeader.'.'.$encodedPayload;
-
-        $signature = '';
-        $result = openssl_sign($signedPart, $signature, $this->keycloakPrivateKey, OPENSSL_ALGO_SHA256);
-
-        if ($result !== true) {
-            $this->fail('Failed to sign RSA JWT for Keycloak token test.');
-        }
-
-        return implode('.', [
-            $encodedHeader,
-            $encodedPayload,
-            $this->base64UrlEncode($signature),
-        ]);
-    }
-
-    private function base64UrlEncode(string $value): string
-    {
-        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
-    }
-
-    /**
-     * @param  array<string, mixed>  $details
-     * @return array<string, string>
-     */
-    private function buildJwk(string $kid, array $details): array
-    {
-        $rsa = $details['rsa'] ?? null;
-
-        if (! is_array($rsa) || ! isset($rsa['n'], $rsa['e'])) {
-            $this->fail('Failed to read RSA key details for JWKS test setup.');
-        }
-
-        return [
-            'kty' => 'RSA',
-            'use' => 'sig',
-            'alg' => 'RS256',
-            'kid' => $kid,
-            'n' => $this->base64UrlEncode($rsa['n']),
-            'e' => $this->base64UrlEncode($rsa['e']),
-        ];
-    }
-
-    /**
-     * @param  array<int, array<string, string>>  $keys
-     */
-    private function fakeJwks(string $jwksUrl, array $keys): void
-    {
-        Cache::flush();
-        config()->set('services.keycloak.jwks_url', $jwksUrl);
-
-        Http::fake([
-            $jwksUrl => Http::response(['keys' => $keys]),
-        ]);
-    }
 }

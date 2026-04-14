@@ -3,7 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\ApUser;
-use App\Models\Playbook;
+use App\Models\Checklist;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
@@ -13,26 +13,20 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class PlaybookStoreControllerTest extends AuthorizationApiTestCase
+class ChecklistStoreControllerTest extends AuthorizationApiTestCase
 {
     use RefreshDatabase;
 
-    public function test_it_creates_a_playbook_when_the_target_scope_is_accessible(): void
+    public function test_it_creates_a_checklist_when_the_target_scope_is_accessible(): void
     {
-        $serverScope = $this->assignRole('keycloak-user-playbook-store', 'server_admin');
-        $tenantScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-a',
-            'name' => 'Tenant A',
-            'parent_scope_id' => $serverScope->id,
-        ]);
+        $scope = $this->assignRole('keycloak-user-checklist-store', 'tenant_admin');
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-store'))
-            ->postJson('/api/playbooks', [
-                'scope_id' => $tenantScope->id,
-                'code' => ' Tenant_Playbook ',
-                'name' => 'Tenant Playbook',
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-store'))
+            ->postJson('/api/checklists', [
+                'scope_id' => $scope->id,
+                'code' => ' Tenant_Checklist ',
+                'name' => 'Tenant Checklist',
             ]);
 
         $response
@@ -40,29 +34,34 @@ class PlaybookStoreControllerTest extends AuthorizationApiTestCase
             ->assertExactJson([
                 'data' => [
                     'id' => 1,
-                    'scope_id' => $tenantScope->id,
-                    'code' => 'tenant-playbook',
-                    'name' => 'Tenant Playbook',
+                    'scope_id' => $scope->id,
+                    'code' => 'tenant-checklist',
+                    'name' => 'Tenant Checklist',
                 ],
             ]);
+
+        $this->assertDatabaseHas('checklists', [
+            'scope_id' => $scope->id,
+            'code' => 'tenant-checklist',
+        ]);
     }
 
     public function test_it_returns_validation_errors_when_scope_and_code_are_duplicated(): void
     {
-        $scope = $this->assignRole('keycloak-user-playbook-store-dup', 'tenant_admin');
+        $scope = $this->assignRole('keycloak-user-checklist-store-dup', 'tenant_admin');
 
-        Playbook::query()->create([
+        Checklist::query()->create([
             'scope_id' => $scope->id,
-            'code' => 'tenant-playbook',
-            'name' => 'Existing Playbook',
+            'code' => 'tenant-checklist',
+            'name' => 'Existing Checklist',
         ]);
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-store-dup'))
-            ->postJson('/api/playbooks', [
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-store-dup'))
+            ->postJson('/api/checklists', [
                 'scope_id' => $scope->id,
-                'code' => ' Tenant_Playbook ',
-                'name' => 'Duplicated Playbook',
+                'code' => ' Tenant_Checklist ',
+                'name' => 'Duplicated Checklist',
             ]);
 
         $response

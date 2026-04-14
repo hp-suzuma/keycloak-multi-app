@@ -3,7 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\ApUser;
-use App\Models\Policy;
+use App\Models\Checklist;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
@@ -13,51 +13,51 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class PolicyIndexControllerTest extends AuthorizationApiTestCase
+class ChecklistIndexControllerTest extends AuthorizationApiTestCase
 {
     use RefreshDatabase;
 
-    public function test_it_returns_only_policies_in_accessible_scopes(): void
+    public function test_it_returns_only_checklists_in_accessible_scopes(): void
     {
-        $serverScope = $this->assignRole('keycloak-user-policies', 'server_admin');
+        $serverScope = $this->assignRole('keycloak-user-checklists', 'server_admin');
         $tenantScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-a',
-            'name' => 'Tenant A',
+            'code' => 'tenant-checklist-a',
+            'name' => 'Tenant Checklist A',
             'parent_scope_id' => $serverScope->id,
         ]);
 
-        $serverPolicy = Policy::query()->create([
+        $serverChecklist = Checklist::query()->create([
             'scope_id' => $serverScope->id,
-            'code' => 'server-policy',
-            'name' => 'Server Policy',
+            'code' => 'server-checklist',
+            'name' => 'Server Checklist',
         ]);
 
-        $tenantPolicy = Policy::query()->create([
+        $tenantChecklist = Checklist::query()->create([
             'scope_id' => $tenantScope->id,
-            'code' => 'tenant-policy',
-            'name' => 'Tenant Policy',
+            'code' => 'tenant-checklist',
+            'name' => 'Tenant Checklist',
         ]);
 
         $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policies'))
-            ->getJson('/api/policies');
+            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklists'))
+            ->getJson('/api/checklists');
 
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
                     [
-                        'id' => $serverPolicy->id,
+                        'id' => $serverChecklist->id,
                         'scope_id' => $serverScope->id,
-                        'code' => 'server-policy',
-                        'name' => 'Server Policy',
+                        'code' => 'server-checklist',
+                        'name' => 'Server Checklist',
                     ],
                     [
-                        'id' => $tenantPolicy->id,
+                        'id' => $tenantChecklist->id,
                         'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-policy',
-                        'name' => 'Tenant Policy',
+                        'code' => 'tenant-checklist',
+                        'name' => 'Tenant Checklist',
                     ],
                 ],
                 'meta' => [
