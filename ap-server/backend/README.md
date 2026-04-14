@@ -198,6 +198,27 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 }
 ```
 
+## 現在の API required permissions 一覧
+
+- `GET /api/health`
+  - required permissions: なし
+  - 理由: 疎通確認用の public endpoint
+- `GET /api/me`
+  - required permissions: なし
+  - 理由: 現在ユーザーの自己参照 endpoint で、未認証時も `current_user: null` を返す契約
+- `GET /api/me/authorization`
+  - required permissions: なし
+  - 理由: 現在ユーザーの AP 側 RBAC 可視化 endpoint で、未認証時も `authorization: null` を返す契約
+
+今後の業務 API は route 定義で `required_permissions` middleware を必ず宣言する。
+
+例:
+
+```php
+Route::get('/objects', ObjectIndexController::class)
+    ->middleware('required_permissions:object.read');
+```
+
 ## コンテナでの作業
 
 起動:
@@ -244,6 +265,7 @@ php artisan test
 - 認可テーブルは `ap_users`、`scopes`、`roles`、`permissions`、`role_permissions`、`user_role_assignments` を基本とする
 - 権限 API の最小入口として `GET /api/me/authorization` を追加し、現状レスポンスは assignment 単位の `scope / role / permissions` と集約済み permission 一覧を返す
 - 初期 seed は `server / service / tenant` と `admin / operator / viewer` の組み合わせロール、および基本 permissions を前提にする
+- API ごとの required permission は `required_permissions` middleware alias で宣言し、`AuthorizationService` が AP DB 上の集約 permission と突き合わせて判定する
 - Keycloak の検証に使う設定値は `KEYCLOAK_ISSUER`、`KEYCLOAK_CLIENT_ID`、`KEYCLOAK_PUBLIC_KEY`
 - Keycloak の検証に使う追加設定値は `KEYCLOAK_JWKS_URL`、`KEYCLOAK_JWKS_CACHE_TTL`、`KEYCLOAK_DISCOVERY_CACHE_TTL`
 - 現時点では `kid` を使った JWKS 自動取得に対応しており、`KEYCLOAK_PUBLIC_KEY` は JWKS 未使用時のフォールバック
@@ -290,3 +312,17 @@ php artisan test
   - ユーザーへのロール付与
   - `id`, `keycloak_sub`, `role_id`, `scope_id`
   - どのスコープに対してどのロールを持つかを保持する
+
+### required permissions ベースの API 認可入口
+
+- 背景: `GET /api/me/authorization` で現在ユーザーの権限可視化はできるが、API 本体で required permission を宣言して 403 判定する入口がまだ無かった
+- 決定事項: 認可判定は `app/Services/Authorization/AuthorizationService.php` に寄せ、Laravel 入口は `required_permissions` middleware alias として `->middleware('required_permissions:object.read')` の形で API ごとに宣言する
+- 影響範囲: `ap-server/backend` の API ルーティング、Controller / middleware 設計、Feature test の protected route 作成方針
+- 次の推奨アクション: 各 API の required permission 一覧を整理し、実運用ルートへ `required_permissions` を順次適用する。スコープ継承込みの判定が必要になった時点で `AuthorizationService` を拡張する
+
+### 現在の public / introspection API の扱い
+
+- 背景: `required_permissions` を追加した時点では、`ap-server/backend` の実 API が `health`、`me`、`me/authorization` に限られており、いずれも業務操作ではなかった
+- 決定事項: 現時点の 3 endpoint は required permissions を付けず、`health` は public、`me` / `me/authorization` は未認証時も `null` を返す introspection endpoint として維持する
+- 影響範囲: `routes/api.php` の route 設計、Feature test の期待値、今後の API 追加時の認可適用判断
+- 次の推奨アクション: 業務データを扱う API を追加する際は、route 定義と README の required permissions 一覧を同時に更新する

@@ -30,11 +30,57 @@ class AuthorizationService
             ];
         }
 
-        if (! is_string($currentUser->id)) {
+        $authorization = $this->resolveAuthorization($currentUser);
+
+        if ($authorization === null) {
             return [
                 'current_user' => $currentUser->toArray(),
                 'authorization' => null,
             ];
+        }
+
+        return [
+            'current_user' => $currentUser->toArray(),
+            'authorization' => $authorization,
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    public function hasRequiredPermissions(?CurrentUser $currentUser, array $requiredPermissions): bool
+    {
+        if ($requiredPermissions === []) {
+            return true;
+        }
+
+        $authorization = $this->resolveAuthorization($currentUser);
+
+        if ($authorization === null) {
+            return false;
+        }
+
+        $effectivePermissions = collect($authorization['permissions']);
+
+        return collect($requiredPermissions)
+            ->every(fn (string $permission): bool => $effectivePermissions->contains($permission));
+    }
+
+    /**
+     * @return array{
+     *     keycloak_sub: string,
+     *     assignments: array<int, array{
+     *         scope: array{id: int, layer: string, code: string, name: string, parent_scope_id: int|null},
+     *         role: array{id: int, slug: string, name: string, scope_layer: string, permission_role: string},
+     *         permissions: array<int, array{id: int, slug: string, name: string}>
+     *     }>,
+     *     permissions: array<int, string>
+     * }|null
+     */
+    private function resolveAuthorization(?CurrentUser $currentUser): ?array
+    {
+        if ($currentUser === null || ! is_string($currentUser->id)) {
+            return null;
         }
 
         $apUser = ApUser::query()
@@ -87,12 +133,9 @@ class AuthorizationService
             ->all();
 
         return [
-            'current_user' => $currentUser->toArray(),
-            'authorization' => [
-                'keycloak_sub' => $currentUser->id,
-                'assignments' => $assignments,
-                'permissions' => $effectivePermissions,
-            ],
+            'keycloak_sub' => $currentUser->id,
+            'assignments' => $assignments,
+            'permissions' => $effectivePermissions,
         ];
     }
 }
