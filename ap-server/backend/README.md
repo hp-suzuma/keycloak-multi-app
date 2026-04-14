@@ -591,6 +591,20 @@ Route::get('/objects', ObjectIndexController::class)
 - 影響範囲: `tests/Concerns/InteractsWithAuthorizationAssignments.php`、`tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Authorization/AuthorizationServiceTest.php`、`tests/Feature/Api/*Test.php`
 - 次の推奨アクション: 次に test 共通化を進めるなら、`ApUser` の `create/updateOrCreate` 差分が本当に意味のある違いかを確認し、完全一致にそろえられる test だけを段階的に base helper へ寄せる
 
+### `ApUser::create()` と `updateOrCreate()` の差分は維持しつつ、登録処理だけ trait 化する
+
+- 背景: 前回の次アクションに沿って `ApUser` 登録差分を見直したところ、`ObjectUpdateControllerTest`、`PlaybookUpdateControllerTest`、`PolicyUpdateControllerTest`、`ChecklistUpdateControllerTest` では同じ `keycloak_sub` に対して 2 回 `assignRole()` を呼び、既存ユーザーへ複数 assignment を積むケースがあった。このため `updateOrCreate()` を `create()` にそろえると補助処理の意図が崩れる一方、`ApUser` の属性セット自体は完全一致していた
+- 決定事項: `tests/Concerns/InteractsWithAuthorizationAssignments.php` に `createAuthorizationUser()` と `updateOrCreateAuthorizationUser()` を追加し、各 test class の `assignRole()` はどちらの登録方式を使うかだけを選ぶ薄いラッパーへさらに縮小する。`create`/`updateOrCreate` の使い分け自体は維持し、同一内容の属性セットだけを共通化する
+- 影響範囲: `tests/Concerns/InteractsWithAuthorizationAssignments.php`、`tests/Feature/Authorization/AuthorizationServiceTest.php`、`tests/Feature/Api/*Test.php`
+- 次の推奨アクション: 次に test helper を縮めるなら、`RequiredPermissionsMiddlewareTest` の既定 scope code のように意図差が残っている箇所には触れず、`assignRole()` のシグネチャや戻り値まで完全一致している class 群だけを候補にする
+
+### 完全一致した `assignRole()` は create 系 / upsert 系の base test に寄せる
+
+- 背景: 前回の整理後、resource 系 feature test の多くは `assignRole(string $keycloakSub, string $roleSlug, ?Scope $scope = null): Scope` という同一シグネチャ・同一戻り値になっており、差分は「`ApUser` を `create` するか `updateOrCreate` するか」だけに縮んでいた
+- 決定事項: `tests/Feature/Api/CreateAuthorizationApiTestCase.php` と `tests/Feature/Api/UpsertAuthorizationApiTestCase.php` を追加し、完全一致していた `assignRole()` は各 test class から削除して base test へ移す。`AuthorizationServiceTest` と `RequiredPermissionsMiddlewareTest` はシグネチャや scope 生成意図が異なるため現状維持とする
+- 影響範囲: `tests/Feature/Api/CreateAuthorizationApiTestCase.php`、`tests/Feature/Api/UpsertAuthorizationApiTestCase.php`、`tests/Feature/Api/Object*Test.php`
+- 次の推奨アクション: 次に test 共通化を進めるなら、helper 本体ではなく test class 側に残っている未使用 import や旧 base class 由来のノイズを、挙動差を生まない範囲で整えるかを確認する
+
 ### 3 つ目の resource `policies` でも同じ共通化境界で成立することを確認
 
 - 背景: 2 resource だけでは、共通 service がたまたま合っているのか、安定した境界なのか判断しづらかった

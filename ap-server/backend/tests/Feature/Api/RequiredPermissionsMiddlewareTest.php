@@ -2,10 +2,7 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\ApUser;
-use App\Models\Role;
 use App\Models\Scope;
-use App\Models\UserRoleAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 
@@ -84,12 +81,7 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
 
     private function assignRole(string $keycloakSub, string $roleSlug): void
     {
-        ApUser::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'display_name' => 'AP User',
-            'email' => $keycloakSub.'@example.com',
-        ]);
-
+        $this->createAuthorizationUser($keycloakSub);
         $scope = Scope::query()->create([
             'layer' => str($roleSlug)->before('_')->value(),
             'code' => $roleSlug.'-scope',

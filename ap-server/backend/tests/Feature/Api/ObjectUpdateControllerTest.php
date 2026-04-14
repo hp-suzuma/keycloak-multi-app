@@ -2,14 +2,11 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\ApUser;
 use App\Models\ManagedObject;
-use App\Models\Role;
 use App\Models\Scope;
-use App\Models\UserRoleAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class ObjectUpdateControllerTest extends AuthorizationApiTestCase
+class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
 {
     use RefreshDatabase;
 
@@ -267,21 +264,6 @@ class ObjectUpdateControllerTest extends AuthorizationApiTestCase
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
             ]);
-    }
-
-    private function assignRole(string $keycloakSub, string $roleSlug, ?Scope $scope = null): Scope
-    {
-        ApUser::query()->updateOrCreate([
-            'keycloak_sub' => $keycloakSub,
-        ], [
-            'display_name' => 'AP User',
-            'email' => $keycloakSub.'@example.com',
-        ]);
-
-        $scope ??= $this->createDefaultScopeForRole($keycloakSub, $roleSlug);
-        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
-
-        return $scope;
     }
 
 }

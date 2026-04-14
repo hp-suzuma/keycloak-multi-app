@@ -2,10 +2,7 @@
 
 namespace Tests\Feature\Authorization;
 
-use App\Models\ApUser;
-use App\Models\Role;
 use App\Models\Scope;
-use App\Models\UserRoleAssignment;
 use App\Services\Auth\CurrentUser;
 use App\Services\Authorization\AuthorizationService;
 use Database\Seeders\AuthorizationSeeder;
@@ -93,12 +90,7 @@ class AuthorizationServiceTest extends TestCase
 
     private function assignRole(string $keycloakSub, string $roleSlug, Scope $scope): void
     {
-        ApUser::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'display_name' => 'AP User',
-            'email' => $keycloakSub.'@example.com',
-        ]);
-
+        $this->createAuthorizationUser($keycloakSub);
         $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
     }
 }

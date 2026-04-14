@@ -2,14 +2,11 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\ApUser;
 use App\Models\ManagedObject;
-use App\Models\Role;
 use App\Models\Scope;
-use App\Models\UserRoleAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class ObjectIndexControllerTest extends AuthorizationApiTestCase
+class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
 {
     use RefreshDatabase;
 
@@ -371,20 +368,6 @@ class ObjectIndexControllerTest extends AuthorizationApiTestCase
                     ],
                 ],
             ]);
-    }
-
-    private function assignRole(string $keycloakSub, string $roleSlug, ?Scope $scope = null): Scope
-    {
-        ApUser::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'display_name' => 'AP User',
-            'email' => $keycloakSub.'@example.com',
-        ]);
-
-        $scope ??= $this->createDefaultScopeForRole($keycloakSub, $roleSlug);
-        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
-
-        return $scope;
     }
 
 }

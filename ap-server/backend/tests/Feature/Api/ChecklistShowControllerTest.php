@@ -2,18 +2,11 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\ApUser;
 use App\Models\Checklist;
-use App\Models\Role;
 use App\Models\Scope;
-use App\Models\UserRoleAssignment;
-use Database\Seeders\AuthorizationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
 
-class ChecklistShowControllerTest extends AuthorizationApiTestCase
+class ChecklistShowControllerTest extends UpsertAuthorizationApiTestCase
 {
     use RefreshDatabase;
 
@@ -43,18 +36,4 @@ class ChecklistShowControllerTest extends AuthorizationApiTestCase
             ]);
     }
 
-    private function assignRole(string $keycloakSub, string $roleSlug, ?Scope $scope = null): Scope
-    {
-        ApUser::query()->updateOrCreate([
-            'keycloak_sub' => $keycloakSub,
-        ], [
-            'display_name' => 'AP User',
-            'email' => $keycloakSub.'@example.com',
-        ]);
-
-        $scope ??= $this->createDefaultScopeForRole($keycloakSub, $roleSlug);
-        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
-
-        return $scope;
-    }
 }
