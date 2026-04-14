@@ -33,4 +33,12 @@ class Scope extends Model
     {
         return $this->hasMany(UserRoleAssignment::class);
     }
+
+    /**
+     * @return HasMany<ManagedObject, $this>
+     */
+    public function managedObjects(): HasMany
+    {
+        return $this->hasMany(ManagedObject::class, 'scope_id');
+    }
 }

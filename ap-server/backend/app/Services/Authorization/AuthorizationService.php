@@ -3,6 +3,7 @@
 namespace App\Services\Authorization;
 
 use App\Models\ApUser;
+use App\Models\Scope;
 use App\Services\Auth\CurrentUser;
 
 class AuthorizationService
@@ -64,6 +65,71 @@ class AuthorizationService
 
         return collect($requiredPermissions)
             ->every(fn (string $permission): bool => $effectivePermissions->contains($permission));
+    }
+
+    public function canAccessScope(?CurrentUser $currentUser, string $requiredPermission, int $scopeId): bool
+    {
+        return collect($this->accessibleScopeIds($currentUser, [$requiredPermission]))
+            ->contains($scopeId);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     * @return array<int, int>
+     */
+    public function accessibleScopeIds(?CurrentUser $currentUser, array $requiredPermissions): array
+    {
+        if ($requiredPermissions === []) {
+            return [];
+        }
+
+        $authorization = $this->resolveAuthorization($currentUser);
+
+        if ($authorization === null) {
+            return [];
+        }
+
+        $assignmentScopeIds = collect($authorization['assignments'])
+            ->filter(function (array $assignment) use ($requiredPermissions): bool {
+                $permissionSlugs = collect($assignment['permissions'])
+                    ->pluck('slug');
+
+                return collect($requiredPermissions)
+                    ->every(fn (string $permission): bool => $permissionSlugs->contains($permission));
+            })
+            ->pluck('scope.id')
+            ->unique()
+            ->values();
+
+        if ($assignmentScopeIds->isEmpty()) {
+            return [];
+        }
+
+        $descendantsByParent = Scope::query()
+            ->get(['id', 'parent_scope_id'])
+            ->groupBy('parent_scope_id');
+
+        $accessibleScopeIds = collect();
+        $queue = $assignmentScopeIds->all();
+
+        while ($queue !== []) {
+            $currentScopeId = array_shift($queue);
+
+            if ($currentScopeId === null || $accessibleScopeIds->contains($currentScopeId)) {
+                continue;
+            }
+
+            $accessibleScopeIds->push($currentScopeId);
+
+            foreach ($descendantsByParent->get($currentScopeId, collect()) as $childScope) {
+                $queue[] = $childScope->id;
+            }
+        }
+
+        return $accessibleScopeIds
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /**
