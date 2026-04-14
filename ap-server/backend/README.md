@@ -584,6 +584,13 @@ Route::get('/objects', ObjectIndexController::class)
 - 影響範囲: `tests/Concerns/InteractsWithKeycloakTokens.php`、`tests/Feature/Api/KeycloakApiTestCase.php`、`tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Api/*Test.php`
 - 次の推奨アクション: 次に test 共通化を進めるなら、`assignRole()` や fixture 作成の重複を resource 横断でまとめるのではなく、まずは JWT 以外でも完全一致している補助処理だけを trait 化する
 
+### `assignRole()` の共通化は assignment の芯だけを trait に寄せる
+
+- 背景: JWT セットアップを base test に寄せた後も、resource 系 feature test には `assignRole()` の重複が残っていた。一方で `ApUser::create()` と `updateOrCreate()` の選択や、一部 test の既定 scope code には差分があり、丸ごと 1 本化すると各 test の意図を潰す懸念があった
+- 決定事項: 完全一致している「既定 scope 作成」と「`Role` 解決 + `UserRoleAssignment` 作成」だけを `tests/Concerns/InteractsWithAuthorizationAssignments.php` に切り出す。各 test class の `assignRole()` は薄いラッパーとして残し、`ApUser` の作り方や scope 生成の差分は各 test 側で保持する
+- 影響範囲: `tests/Concerns/InteractsWithAuthorizationAssignments.php`、`tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Authorization/AuthorizationServiceTest.php`、`tests/Feature/Api/*Test.php`
+- 次の推奨アクション: 次に test 共通化を進めるなら、`ApUser` の `create/updateOrCreate` 差分が本当に意味のある違いかを確認し、完全一致にそろえられる test だけを段階的に base helper へ寄せる
+
 ### 3 つ目の resource `policies` でも同じ共通化境界で成立することを確認
 
 - 背景: 2 resource だけでは、共通 service がたまたま合っているのか、安定した境界なのか判断しづらかった

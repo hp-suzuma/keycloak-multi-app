@@ -96,19 +96,8 @@ class PlaybookUpdateControllerTest extends AuthorizationApiTestCase
             'email' => $keycloakSub.'@example.com',
         ]);
 
-        $scope ??= Scope::query()->create([
-            'layer' => str($roleSlug)->before('_')->value(),
-            'code' => $roleSlug.'-scope-'.$keycloakSub,
-            'name' => $roleSlug.' scope',
-        ]);
-
-        $role = Role::query()->where('slug', $roleSlug)->firstOrFail();
-
-        UserRoleAssignment::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'role_id' => $role->id,
-            'scope_id' => $scope->id,
-        ]);
+        $scope ??= $this->createDefaultScopeForRole($keycloakSub, $roleSlug);
+        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
 
         return $scope;
     }

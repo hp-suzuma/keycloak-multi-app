@@ -95,13 +95,6 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
             'code' => $roleSlug.'-scope',
             'name' => $roleSlug.' scope',
         ]);
-
-        $role = Role::query()->where('slug', $roleSlug)->firstOrFail();
-
-        UserRoleAssignment::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'role_id' => $role->id,
-            'scope_id' => $scope->id,
-        ]);
+        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
     }
 }

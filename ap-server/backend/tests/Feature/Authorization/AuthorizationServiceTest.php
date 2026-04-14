@@ -10,10 +10,12 @@ use App\Services\Auth\CurrentUser;
 use App\Services\Authorization\AuthorizationService;
 use Database\Seeders\AuthorizationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\InteractsWithAuthorizationAssignments;
 use Tests\TestCase;
 
 class AuthorizationServiceTest extends TestCase
 {
+    use InteractsWithAuthorizationAssignments;
     use RefreshDatabase;
 
     public function test_it_returns_accessible_scope_ids_for_a_permission_including_descendants(): void
@@ -97,12 +99,6 @@ class AuthorizationServiceTest extends TestCase
             'email' => $keycloakSub.'@example.com',
         ]);
 
-        $role = Role::query()->where('slug', $roleSlug)->firstOrFail();
-
-        UserRoleAssignment::query()->create([
-            'keycloak_sub' => $keycloakSub,
-            'role_id' => $role->id,
-            'scope_id' => $scope->id,
-        ]);
+        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
     }
 }
