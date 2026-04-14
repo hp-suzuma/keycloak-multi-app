@@ -6,7 +6,7 @@ use App\Models\Checklist;
 use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class ChecklistIndexControllerTest extends UpsertAuthorizationApiTestCase
+class ChecklistIndexControllerTest extends ScopedIndexValidationApiTestCase
 {
     use RefreshDatabase;
 
@@ -68,4 +68,8 @@ class ChecklistIndexControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
+    public function test_it_rejects_invalid_query_filters(): void
+    {
+        $this->assertIndexRejectsInvalidFilters('/api/checklists');
+    }
 }

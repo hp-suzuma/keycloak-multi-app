@@ -5,9 +5,11 @@ namespace Tests\Feature\Api;
 use App\Models\ManagedObject;
 use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\InteractsWithScopedIndexValidation;
 
 class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
 {
+    use InteractsWithScopedIndexValidation;
     use RefreshDatabase;
 
     public function test_it_returns_an_empty_list_when_the_user_has_object_read_permission(): void
@@ -370,4 +372,8 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ]);
     }
 
+    public function test_it_rejects_invalid_query_filters(): void
+    {
+        $this->assertIndexRejectsInvalidFilters('/api/objects');
+    }
 }

@@ -43,9 +43,17 @@ class IndexScopedResourceRequest extends FormRequest
             'scope_id' => ['nullable', 'integer', 'exists:scopes,id'],
             'code' => ['nullable', 'string', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
-            'sort' => ['nullable', Rule::in(['id', '-id', 'code', '-code', 'name', '-name'])],
+            'sort' => ['nullable', Rule::in($this->allowedSorts())],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function allowedSorts(): array
+    {
+        return ['id', '-id', 'code', '-code', 'name', '-name'];
     }
 }

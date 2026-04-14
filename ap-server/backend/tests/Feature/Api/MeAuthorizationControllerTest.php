@@ -7,11 +7,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Scope;
 use App\Models\UserRoleAssignment;
-use Database\Seeders\AuthorizationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
 
 class MeAuthorizationControllerTest extends AuthorizationApiTestCase
 {

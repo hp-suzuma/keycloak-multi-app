@@ -6,7 +6,7 @@ use App\Models\Policy;
 use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class PolicyIndexControllerTest extends UpsertAuthorizationApiTestCase
+class PolicyIndexControllerTest extends ScopedIndexValidationApiTestCase
 {
     use RefreshDatabase;
 
@@ -68,4 +68,8 @@ class PolicyIndexControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
+    public function test_it_rejects_invalid_query_filters(): void
+    {
+        $this->assertIndexRejectsInvalidFilters('/api/policies');
+    }
 }

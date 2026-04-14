@@ -619,6 +619,41 @@ Route::get('/objects', ObjectIndexController::class)
 - 影響範囲: `database/migrations/2026_04_14_000003_create_checklists_table.php`、`app/Models/Checklist.php`、`app/Http/Controllers/Api/Checklist*Controller.php`、`app/Services/Checklist/*`、`routes/api.php`、`tests/Feature/Api/Checklist*Test.php`
 - 次の推奨アクション: 次に見直すなら CRUD resource の追加ではなく、index controller の query validation や JWT テストセットアップのように、4 resource で同じ形を保っている補助層に横断的な共通化余地があるかを確認する
 
+### index query validation の共通契約は補助 trait で固定する
+
+- 背景: `IndexScopedResourceRequest` を 4 resource で共通利用する構成にはなっていたが、invalid query の `422 Unprocessable Entity` 契約までは resource 横断で明示的に固定できていなかった
+- 決定事項: `tests/Concerns/InteractsWithScopedIndexValidation.php` と `tests/Feature/Api/ScopedIndexValidationApiTestCase.php` を追加し、`objects` / `playbooks` / `policies` / `checklists` の各 index test から同じ invalid filter ケースを共有して検証する。これにより `scope_id` / `sort` / `page` / `per_page` の validation 契約は HTTP 補助層の共通仕様として扱う
+- 影響範囲: `tests/Concerns/InteractsWithScopedIndexValidation.php`、`tests/Feature/Api/ScopedIndexValidationApiTestCase.php`、`tests/Feature/Api/ObjectIndexControllerTest.php`、`tests/Feature/Api/PlaybookIndexControllerTest.php`、`tests/Feature/Api/PolicyIndexControllerTest.php`、`tests/Feature/Api/ChecklistIndexControllerTest.php`
+- 次の推奨アクション: 将来 resource ごとに許可する sort key や query 項目が分岐する場合は、controller 内で条件分岐を増やさず、`IndexScopedResourceRequest` の継承や resource 別 request 追加で HTTP 入力契約を分離する
+
+### index controller は resource 別 request を受ける形へ先に分離する
+
+- 背景: 前回の推奨アクションどおり、今後 resource ごとに許可する sort key や query 項目が分岐した際に、共通 request と controller に条件分岐を足し始めると HTTP 層の責務境界が崩れやすかった
+- 決定事項: `IndexScopedResourceRequest` には共通ルールだけを残し、`allowedSorts()` を override 可能にしたうえで、`ObjectIndexRequest`、`PlaybookIndexRequest`、`PolicyIndexRequest`、`ChecklistIndexRequest` を追加した。各 index controller は対応する resource 別 request を受ける構成に切り替え、現時点の入力契約は維持する
+- 影響範囲: `app/Http/Requests/Api/IndexScopedResourceRequest.php`、`app/Http/Requests/Api/ObjectIndexRequest.php`、`app/Http/Requests/Api/PlaybookIndexRequest.php`、`app/Http/Requests/Api/PolicyIndexRequest.php`、`app/Http/Requests/Api/ChecklistIndexRequest.php`、`app/Http/Controllers/Api/*IndexController.php`
+- 次の推奨アクション: 実際に resource ごとの index query 差分が必要になったら、共通 request は触りすぎず、対象 resource の request class だけで `allowedSorts()` や追加 rule を拡張して契約差分を閉じ込める
+
+### API feature test の不要 import は class 側から段階的に落とす
+
+- 背景: test helper の共通化後も、一部 feature test には旧継承構成由来の不要 import が残っており、class 本体の意図より補助ノイズが目立つ箇所があった
+- 決定事項: `MeControllerTest` と `MeAuthorizationControllerTest` から、継承元で置き換わっていて未使用になっていた `Tests\TestCase` / `AuthorizationSeeder` import を削除した。挙動差を生みやすい helper ロジックや scope 生成意図には触れず、class 冒頭の完全に不要な記述だけを整理する方針とした
+- 影響範囲: `tests/Feature/Api/MeControllerTest.php`、`tests/Feature/Api/MeAuthorizationControllerTest.php`
+- 次の推奨アクション: 次に test 側のノイズを減らすなら、同じく挙動差を生まない範囲で `tests/Feature/Api` 配下の未使用 import や空行ゆれだけを点検し、helper や fixture の責務には踏み込まない
+
+### API feature test の空行ゆれは同型 class からそろえる
+
+- 背景: import 整理の次に `tests/Feature/Api` を見直すと、同じタイミングで追加した index 系 test に class 末尾の空行ゆれが残っており、小さなことでも横並びの読みやすさを落としていた
+- 決定事項: `ObjectIndexControllerTest`、`PlaybookIndexControllerTest`、`PolicyIndexControllerTest`、`ChecklistIndexControllerTest` の class 末尾にだけあった余分な空行を削除し、同型の test class で閉じ方をそろえた。helper や assertion 本体には触れず、整形差分だけに限定する
+- 影響範囲: `tests/Feature/Api/ObjectIndexControllerTest.php`、`tests/Feature/Api/PlaybookIndexControllerTest.php`、`tests/Feature/Api/PolicyIndexControllerTest.php`、`tests/Feature/Api/ChecklistIndexControllerTest.php`
+- 次の推奨アクション: 次に test 側を整えるなら、機械的にそろえられる空行や import のみを対象にし、assertion の表現統一や helper への寄せ直しのような意味差が入りうる変更は別タスクとして切り分ける
+
+### API feature test の未使用 import は 1 file ずつ安全に落とす
+
+- 背景: 前回の方針どおり `tests/Feature/Api` を点検すると、`MeAuthorizationControllerTest` に `Cache` / `Http` の import が残っていたが、test 本文では参照されていなかった
+- 決定事項: `MeAuthorizationControllerTest` から未使用の `Illuminate\Support\Facades\Cache` と `Illuminate\Support\Facades\Http` import を削除した。複数 file を一度に機械処理せず、使用有無を確認できた file だけを個別に整える方針を継続する
+- 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`
+- 次の推奨アクション: 次に test 側のノイズを減らすなら、同じく `tests/Feature/Api` 配下で「import はあるが `::` 参照や型参照が無い」file を 1 件ずつ確認し、削除前に README 更新と関連 test 実行をセットで行う
+
 ## コンテナでの作業
 
 起動:

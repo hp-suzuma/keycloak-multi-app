@@ -6,7 +6,7 @@ use App\Models\Playbook;
 use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class PlaybookIndexControllerTest extends UpsertAuthorizationApiTestCase
+class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
 {
     use RefreshDatabase;
 
@@ -158,4 +158,8 @@ class PlaybookIndexControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
+    public function test_it_rejects_invalid_query_filters(): void
+    {
+        $this->assertIndexRejectsInvalidFilters('/api/playbooks');
+    }
 }
