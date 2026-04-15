@@ -17,11 +17,7 @@ class ObjectShowControllerTest extends CreateAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-1')
             ->getJson('/api/objects/999999');
 
-        $response
-            ->assertNotFound()
-            ->assertExactJson([
-                'message' => 'Not Found',
-            ]);
+        $this->assertNotFoundResponse($response);
     }
 
     public function test_it_returns_forbidden_when_the_object_scope_is_not_accessible(): void
@@ -49,13 +45,7 @@ class ObjectShowControllerTest extends CreateAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-2')
             ->getJson('/api/objects/'.$managedObject->id);
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.read'],
-                'scope_id' => $forbiddenScope->id,
-            ]);
+        $this->assertForbiddenResponse($response, ['object.read'], $forbiddenScope->id);
     }
 
     public function test_it_returns_the_object_when_the_scope_is_accessible(): void
@@ -87,6 +77,29 @@ class ObjectShowControllerTest extends CreateAuthorizationApiTestCase
                     'code' => 'object-c',
                     'name' => 'Object C',
                 ],
+            ]);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions, int $scopeId): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
+                'scope_id' => $scopeId,
+            ]);
+    }
+
+    private function assertNotFoundResponse($response): void
+    {
+        $response
+            ->assertNotFound()
+            ->assertExactJson([
+                'message' => 'Not Found',
             ]);
     }
 }

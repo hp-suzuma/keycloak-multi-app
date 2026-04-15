@@ -1048,3 +1048,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/RequiredPermissionsMiddlewareTest.php` に `assertOkStatusResponse()` と `assertForbiddenResponse()` を追加し、同型 assertion を file 内 helper へ寄せた。route 定義や permission payload の期待値は変更せず、test 本体では「誰が通るか / 弾かれるか」が先に読める形を優先した
 - 影響範囲: `tests/Feature/Api/RequiredPermissionsMiddlewareTest.php`、required permissions middleware test の assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Object show controller test の固定 error response assertion を file 内 helper に寄せる
+
+- 背景: 次の 1 file ノイズ候補として `ObjectShowControllerTest` を見ると、`Not Found` と `Forbidden` の固定 error response assertion が file 内で繰り返されていた。対象は 3 test のうち 2 test に限られ、object 表示の成功系 assertion とは責務が分かれていたため、挙動を変えずに読み筋だけ整えやすかった
+- 決定事項: `tests/Feature/Api/ObjectShowControllerTest.php` に `assertNotFoundResponse()` と `assertForbiddenResponse()` を追加し、固定 payload の assertion を file 内 helper へ寄せた。成功系の `data` assertion は個別性が高いためそのまま残し、error response だけを整理対象にした
+- 影響範囲: `tests/Feature/Api/ObjectShowControllerTest.php`、object show test の error response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
