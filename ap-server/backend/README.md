@@ -1174,3 +1174,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectIndexControllerTest.php` に `metaPayload()` を追加し、`current_page` / `per_page` / `total` / `last_page` / `filters` の共通 shape を file 内 helper に寄せた。data 配列は各 test の中心なのでそのまま残し、index 系の共通 helper へは広げない
 - 影響範囲: `tests/Feature/Api/ObjectIndexControllerTest.php`、object index test の meta assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、index 系の他 file でも `meta` の繰り返しが 1 file 内で目立つかを見つつ、広域共通化ではなく 1 file 単位で小さく整える
+
+### Playbook index controller test の meta payload も file 内 helper に寄せる
+
+- 背景: `PlaybookIndexControllerTest` も index 系の近接 file と同じく、一覧成功時と filter/sort 成功時で `meta` の shape が繰り返されていた。forbidden response helper はすでに分かれているため、`meta` だけを寄せると file 内の役割分担も崩さずに済んだ
+- 決定事項: `tests/Feature/Api/PlaybookIndexControllerTest.php` に `metaPayload()` を追加し、共通の `meta` assertion を file 内 helper に寄せた。`data` 配列と forbidden response helper はテスト意図の中心なのでそのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookIndexControllerTest.php`、playbook index test の meta assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、index 系の残り file でも `meta` の繰り返しが helper 化に見合うかを見つつ、同じく 1 file 単位で小さく整える

@@ -72,18 +72,7 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
                         'name' => 'Tenant Runbook',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(2),
             ]);
     }
 
@@ -136,18 +125,11 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
                         'name' => 'Target Zebra',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => $tenantScope->id,
-                        'code' => null,
-                        'name' => 'Target',
-                        'sort' => 'code',
-                    ],
-                ],
+                'meta' => $this->metaPayload(2, [
+                    'scope_id' => $tenantScope->id,
+                    'name' => 'Target',
+                    'sort' => 'code',
+                ]),
             ]);
     }
 
@@ -167,5 +149,21 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
                 'message' => 'Forbidden',
                 'required_permissions' => $requiredPermissions,
             ]);
+    }
+
+    private function metaPayload(int $total, array $filters = []): array
+    {
+        return [
+            'current_page' => 1,
+            'per_page' => 20,
+            'total' => $total,
+            'last_page' => 1,
+            'filters' => array_merge([
+                'scope_id' => null,
+                'code' => null,
+                'name' => null,
+                'sort' => null,
+            ], $filters),
+        ];
     }
 }
