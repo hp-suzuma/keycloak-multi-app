@@ -1314,3 +1314,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertValidationFailedResponse()` を追加し、重複 code の validation response で `message` と `errors` を持つ外側 shape を helper に寄せた。`assertJsonValidationErrors()` を使う invalid payload case、`assertForbiddenResponse()`、success response の記述は現状維持にした
 - 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の validation response assertion 記述、object 系 validation helper の粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、object 系 helper の追加はいったん止めて、別の長めの file で validation や forbidden response の外側 shape が複数回出ている箇所があるかを探す
+
+### validation / forbidden response 整理はここでいったん打ち止めにする
+
+- 背景: 上の推奨アクションに沿って object 系以外も含めて長めの file と shared base を見直したが、`PlaybookIndexControllerTest` は forbidden helper が 1 箇所だけ、`ScopedIndexValidationApiTestCase` / `InteractsWithScopedIndexValidation` はすでに validation を共通化済みだった。`PolicyIndexControllerTest` と `ChecklistIndexControllerTest` に残っている重複は success payload / meta 側で、今回の「validation や forbidden response の外側 shape」を小さく寄せる基準とはずれていた
+- 決定事項: validation / forbidden response を起点にした helper 追加はここでいったん止める。今後はこの軸で新しい helper を機械的に足さず、別の明確な重複系列が見つかったときにだけ再開する
+- 影響範囲: `tests/Feature/Api` の validation / forbidden helper 追加判断、index 系 test の今後の探索起点、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、`PolicyIndexControllerTest` と `ChecklistIndexControllerTest` を起点に、index 系の success payload / meta assertion で残っている固定 shape を `ObjectIndexControllerTest` / `PlaybookIndexControllerTest` と同じ粒度で揃えられるかを見る
