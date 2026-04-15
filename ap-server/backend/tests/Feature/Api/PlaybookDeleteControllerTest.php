@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Playbook;
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class PlaybookDeleteControllerTest extends UpsertAuthorizationApiTestCase
@@ -26,5 +25,4 @@ class PlaybookDeleteControllerTest extends UpsertAuthorizationApiTestCase
 
         $response->assertNoContent();
     }
-
 }

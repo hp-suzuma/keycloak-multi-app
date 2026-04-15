@@ -87,5 +87,4 @@ class ObjectDeleteControllerTest extends CreateAuthorizationApiTestCase
             'id' => $managedObject->id,
         ]);
     }
-
 }

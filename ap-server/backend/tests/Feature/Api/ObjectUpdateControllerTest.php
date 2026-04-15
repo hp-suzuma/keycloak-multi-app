@@ -265,5 +265,4 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }

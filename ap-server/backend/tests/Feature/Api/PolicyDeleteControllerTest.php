@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Policy;
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class PolicyDeleteControllerTest extends UpsertAuthorizationApiTestCase
@@ -26,5 +25,4 @@ class PolicyDeleteControllerTest extends UpsertAuthorizationApiTestCase
 
         $response->assertNoContent();
     }
-
 }

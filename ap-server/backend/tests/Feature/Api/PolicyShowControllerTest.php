@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Policy;
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class PolicyShowControllerTest extends UpsertAuthorizationApiTestCase
@@ -35,5 +34,4 @@ class PolicyShowControllerTest extends UpsertAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }

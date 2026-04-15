@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Checklist;
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
@@ -66,5 +65,4 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }

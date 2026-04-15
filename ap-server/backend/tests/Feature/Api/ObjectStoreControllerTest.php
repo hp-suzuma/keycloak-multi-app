@@ -124,5 +124,4 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }

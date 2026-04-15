@@ -79,5 +79,4 @@ class ChecklistUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }

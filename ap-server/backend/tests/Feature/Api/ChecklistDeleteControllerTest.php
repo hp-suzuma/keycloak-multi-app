@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Checklist;
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ChecklistDeleteControllerTest extends UpsertAuthorizationApiTestCase
@@ -26,5 +25,4 @@ class ChecklistDeleteControllerTest extends UpsertAuthorizationApiTestCase
 
         $response->assertNoContent();
     }
-
 }

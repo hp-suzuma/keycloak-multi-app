@@ -761,3 +761,59 @@ php artisan test
 - 決定事項: 現時点の 3 endpoint は required permissions を付けず、`health` は public、`me` / `me/authorization` は未認証時も `null` を返す introspection endpoint として維持する
 - 影響範囲: `routes/api.php` の route 設計、Feature test の期待値、今後の API 追加時の認可適用判断
 - 次の推奨アクション: 業務データを扱う API を追加する際は、route 定義と README の required permissions 一覧を同時に更新する
+
+### API feature test の未使用 import は 1 file ずつ README と test をセットで進める
+
+- 背景: 直前の引継ぎどおり `tests/Feature/Api` 配下のノイズを減らす次段では、複数 file をまとめて機械処理せず、未使用 import を本文参照まで確認できた file に限定して安全に落とす必要があった
+- 決定事項: 今回は `tests/Feature/Api/ChecklistDeleteControllerTest.php` だけを対象にし、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。関連確認もこの file の feature test 実行に閉じ、横展開は次タスクに分離する
+- 影響範囲: `tests/Feature/Api/ChecklistDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同種の整理を進める場合も `tests/Feature/Api` 配下の候補を 1 file だけ選び、未使用 import の実参照確認、README 更新、対象 feature test 実行を同じ作業単位で行う
+
+### API feature test の未使用 import 整理は同系統 file でも 1 件ずつ継続する
+
+- 背景: 前回の整理後も、同じ `UpsertAuthorizationApiTestCase` 系の store / delete test に `Scope` import が残っており、1 file ずつ進める方針を継続しないと、複数 resource をまとめて触る機械差分になりやすかった
+- 決定事項: 今回は `tests/Feature/Api/ChecklistStoreControllerTest.php` だけを対象にし、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。前回と同様に対象 test だけを実行し、隣接 file への横展開はまだ行わない
+- 影響範囲: `tests/Feature/Api/ChecklistStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同種の整理を進める場合は、残っている `Scope` import 候補から 1 file を選び、今回と同じく README 更新と対象 feature test 実行をセットで進める
+
+### API feature test の未使用 import 整理は resource をまたいでも 1 file 単位を崩さない
+
+- 背景: checklist 系を 2 件整理した後も、playbook / policy / checklist の show・store・delete test に同種の `Scope` import が残っており、resource 単位でまとめて処理すると「安全確認済みの 1 file 編集」という前提が崩れやすかった
+- 決定事項: 今回は `tests/Feature/Api/PlaybookDeleteControllerTest.php` だけを対象にし、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。確認もこの file の feature test 実行に限定し、他 resource の同型 file は次タスクへ残す
+- 影響範囲: `tests/Feature/Api/PlaybookDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同種の整理を進める場合も、残りの show / store / delete test から 1 file を選び、未使用 import の実参照確認、README 更新、対象 feature test 実行を同じ単位で継続する
+
+### API feature test の未使用 import 整理は delete 系でも resource ごとに分けて進める
+
+- 背景: delete controller test には checklist / playbook / policy で同型の未使用 `Scope` import が残っていたが、複数 resource を同時に触ると「1 file ずつ確認して進める」という引継ぎ方針から外れやすかった
+- 決定事項: 今回は `tests/Feature/Api/PolicyDeleteControllerTest.php` だけを対象にし、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。確認もこの file の feature test 実行だけに閉じ、他の delete / show / store test は別作業のまま維持する
+- 影響範囲: `tests/Feature/Api/PolicyDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同種の整理を進める場合は、残っている show / store test の候補から 1 file を選び、未使用 import の実参照確認、README 更新、対象 feature test 実行を今回と同じ粒度で続ける
+
+### API feature test の未使用 import 整理は show 系も 1 file ずつ閉じる
+
+- 背景: delete 系を個別に整理したあとも、show 系 test に同型の `Scope` import が残っており、resource を横断して一括削除すると README に残している「1 file 単位での安全確認」が曖昧になりやすかった
+- 決定事項: 今回は `tests/Feature/Api/ChecklistShowControllerTest.php` だけを対象にし、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。確認もこの file の feature test 実行だけに限定し、他の show / store test は次タスクへ分離する
+- 影響範囲: `tests/Feature/Api/ChecklistShowControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同種の整理を進める場合は、残っている show / store test の候補から 1 file を選び、未使用 import の実参照確認、README 更新、対象 feature test 実行を同じ単位で継続する
+
+### API feature test の未使用 import 整理は残件が見えている場合に限り連続実施で畳む
+
+- 背景: `ChecklistShowControllerTest` 整理後に残候補を再確認すると、未使用 `Scope` import は `PolicyShowControllerTest` と `PolicyStoreControllerTest` の 2 file のみだった。今回の依頼では、この整理タスクに限って変更確認や `docker compose exec` 実行確認は不要と明示されたため、残件を連続で片づけてシリーズを閉じる方が引継ぎ上も分かりやすかった
+- 決定事項: `tests/Feature/Api/PolicyShowControllerTest.php` と `tests/Feature/Api/PolicyStoreControllerTest.php` から、本文でも型参照でも未使用だった `App\Models\Scope` import を削除した。今回の整理ではユーザー指示に従い、各 file ごとの確認メッセージや `docker compose exec` による個別 test 実行は省略した
+- 影響範囲: `tests/Feature/Api/PolicyShowControllerTest.php`、`tests/Feature/Api/PolicyStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 側のノイズを減らすなら、今回と同じ「未使用 import」だけに限定せず、`tests/Feature/Api` 配下で空行ゆれや import 並びのような意味差を生まない整形差分がまだ残っているかを 1 テーマずつ確認する
+
+### API feature test の class 末尾空行ゆれは同型の整形差分としてまとめてそろえる
+
+- 背景: 未使用 import 整理の次に `tests/Feature/Api` を点検すると、一部の CRUD controller test で class 末尾の `}` 直前にだけ空行が残っており、同じ系統の test class 間で閉じ方がそろっていなかった
+- 決定事項: class 末尾直前の余分な空行だけを対象にし、`ChecklistUpdateControllerTest`、`ObjectDeleteControllerTest`、`ObjectShowControllerTest`、`ObjectStoreControllerTest`、`ObjectUpdateControllerTest`、`PlaybookShowControllerTest`、`PlaybookStoreControllerTest`、`PlaybookUpdateControllerTest`、`PolicyUpdateControllerTest` の閉じ方をそろえた。assertion や helper、import には触れず、整形差分だけに限定する
+- 影響範囲: `tests/Feature/Api/ChecklistUpdateControllerTest.php`、`tests/Feature/Api/ObjectDeleteControllerTest.php`、`tests/Feature/Api/ObjectShowControllerTest.php`、`tests/Feature/Api/ObjectStoreControllerTest.php`、`tests/Feature/Api/ObjectUpdateControllerTest.php`、`tests/Feature/Api/PlaybookShowControllerTest.php`、`tests/Feature/Api/PlaybookStoreControllerTest.php`、`tests/Feature/Api/PlaybookUpdateControllerTest.php`、`tests/Feature/Api/PolicyUpdateControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 側のノイズを減らすなら、`tests/Feature/Api` 配下の import 並びや空行配置のうち、class 末尾以外にも意味差を生まない整形ゆれが残っていないかを 1 テーマずつ確認する
+
+### API feature test の import 並びと末尾スペースは現時点で追加整形不要
+
+- 背景: class 末尾空行をそろえた次のテーマとして `tests/Feature/Api` 配下の import 並びと末尾スペースを点検したが、ここで無理に差分を作ると「整形のための整形」になりやすかった
+- 決定事項: import block の昇順ゆれと末尾スペースを確認した結果、追加で直すべき file は見つからなかったため、このテーマではコード変更を行わない。意味差を生まない整形差分は、機械的に不一致が確認できたものだけを対象にする方針を継続する
+- 影響範囲: `tests/Feature/Api` 配下の整形判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 側のノイズを減らすなら、整形テーマの探索はいったん区切り、`tests/Feature/Api` とその基底 test case で責務の薄い重複 helper や fixture 構築がないかを「挙動を変えない小さな共通化候補」として確認する

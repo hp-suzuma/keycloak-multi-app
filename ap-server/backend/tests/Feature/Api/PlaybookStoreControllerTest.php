@@ -67,5 +67,4 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                 ],
             ]);
     }
-
 }
