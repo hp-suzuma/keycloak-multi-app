@@ -56,6 +56,11 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Duplicated Playbook',
             ]);
 
+        $this->assertDuplicateCodeValidationResponse($response);
+    }
+
+    private function assertDuplicateCodeValidationResponse($response): void
+    {
         $response
             ->assertUnprocessable()
             ->assertExactJson([

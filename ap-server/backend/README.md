@@ -1090,3 +1090,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookIndexControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。index 成功系と invalid filter の assertion は個別性が高いためそのまま残した
 - 影響範囲: `tests/Feature/Api/PlaybookIndexControllerTest.php`、playbook index test の forbidden response 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Playbook store controller test の重複 code validation assertion を file 内 helper に寄せる
+
+- 背景: playbook 系の次候補として `PlaybookStoreControllerTest` を確認すると、重複 code 時の validation payload は 1 箇所だけだったが、store 系 test では成功系と失敗系の読み分けが主になるため、固定の failure assertion を helper へ寄せると本文の見通しを少し保ちやすかった
+- 決定事項: `tests/Feature/Api/PlaybookStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。作成成功系の response は個別性が高いためそのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookStoreControllerTest.php`、playbook store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
