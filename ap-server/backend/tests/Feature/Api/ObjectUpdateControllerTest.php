@@ -232,14 +232,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'code' => ' Duplicated_Code ',
             ]);
 
-        $response
-            ->assertUnprocessable()
-            ->assertExactJson([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'code' => ['The code has already been taken within the target scope.'],
-                ],
-            ]);
+        $this->assertDuplicateCodeValidationResponse($response);
     }
 
     /**
@@ -262,6 +255,18 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             ->assertNotFound()
             ->assertExactJson([
                 'message' => 'Not Found',
+            ]);
+    }
+
+    private function assertDuplicateCodeValidationResponse($response): void
+    {
+        $response
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Validation failed',
+                'errors' => [
+                    'code' => ['The code has already been taken within the target scope.'],
+                ],
             ]);
     }
 }

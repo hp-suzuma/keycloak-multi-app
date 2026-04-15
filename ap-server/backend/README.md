@@ -1125,3 +1125,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。既存の `assertForbiddenResponse()` と成功系 assertion は役割が分かれているためそのまま残した
 - 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Object update controller test の重複 code validation assertion も file 内 helper に寄せる
+
+- 背景: `ObjectUpdateControllerTest` には not found / forbidden helper はすでにあったが、target scope 内での重複 code validation payload だけは本文に残っていた。object の store/update を並べて読むと failure assertion の置き方が少しだけ揃っていなかった
+- 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。no fields payload は object update 固有の文脈が強いため本文のまま残した
+- 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の duplicate validation assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
