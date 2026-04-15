@@ -26,16 +26,13 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Playbook',
             ]);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $playbook->id,
-                    'scope_id' => $scope->id,
-                    'code' => 'updated-playbook',
-                    'name' => 'Updated Playbook',
-                ],
-            ]);
+        $this->assertPlaybookResponse(
+            $response,
+            $playbook->id,
+            $scope->id,
+            'updated-playbook',
+            'Updated Playbook',
+        );
     }
 
     public function test_it_moves_the_playbook_when_the_user_can_update_current_scope_and_create_in_target_scope(): void
@@ -66,14 +63,25 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Moved Playbook',
             ]);
 
+        $this->assertPlaybookResponse(
+            $response,
+            $playbook->id,
+            $targetScope->id,
+            'playbook-a',
+            'Moved Playbook',
+        );
+    }
+
+    private function assertPlaybookResponse($response, int $playbookId, int $scopeId, string $code, string $name): void
+    {
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $playbook->id,
-                    'scope_id' => $targetScope->id,
-                    'code' => 'playbook-a',
-                    'name' => 'Moved Playbook',
+                    'id' => $playbookId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }

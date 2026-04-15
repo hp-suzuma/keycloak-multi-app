@@ -1132,3 +1132,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。no fields payload は object update 固有の文脈が強いため本文のまま残した
 - 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の duplicate validation assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Playbook update controller test の success response assertion を file 内 helper に寄せる
+
+- 背景: 固定 failure assertion の整理が一巡したあと `PlaybookUpdateControllerTest` を見直すと、更新成功時と scope 移動成功時で response の shape 自体は同じなのに、本文に `assertExactJson()` が 2 回並んでいた。差し替わるのは `scope_id` / `code` / `name` だけなので、本文では操作の違いだけを追える方が読みやすかった
+- 決定事項: `tests/Feature/Api/PlaybookUpdateControllerTest.php` に `assertPlaybookResponse()` を追加し、success response assertion を file 内 helper に寄せた。store 系や index 系のようにレスポンス差分が大きい file には広げず、同じ shape が 1 file 内で繰り返されるケースだけに留める
+- 影響範囲: `tests/Feature/Api/PlaybookUpdateControllerTest.php`、playbook update test の success response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
