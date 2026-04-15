@@ -40,9 +40,7 @@ class ApiRoutePermissionPolicyTest extends TestCase
 
     private function assertRouteDoesNotRequirePermissions(string $routeName): void
     {
-        $route = Route::getRoutes()->getByName($routeName);
-
-        $this->assertNotNull($route, sprintf('Route [%s] was not found.', $routeName));
+        $route = $this->resolveRoute($routeName);
         $this->assertNotContains(
             'required_permissions',
             $route->middleware(),
@@ -52,13 +50,20 @@ class ApiRoutePermissionPolicyTest extends TestCase
 
     private function assertRouteRequiresPermissions(string $routeName, string $requiredMiddleware): void
     {
-        $route = Route::getRoutes()->getByName($routeName);
-
-        $this->assertNotNull($route, sprintf('Route [%s] was not found.', $routeName));
+        $route = $this->resolveRoute($routeName);
         $this->assertContains(
             $requiredMiddleware,
             $route->middleware(),
             sprintf('Route [%s] should declare [%s].', $routeName, $requiredMiddleware),
         );
+    }
+
+    private function resolveRoute(string $routeName): \Illuminate\Routing\Route
+    {
+        $route = Route::getRoutes()->getByName($routeName);
+
+        $this->assertNotNull($route, sprintf('Route [%s] was not found.', $routeName));
+
+        return $route;
     }
 }

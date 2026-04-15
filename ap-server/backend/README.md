@@ -1034,3 +1034,10 @@ php artisan test
 - 決定事項: 現時点では「子クラス間で流れは同じだが差し替え点が 1 箇所だけ」の補助処理について、追加の共通化は採用しない。このテーマはここでいったん完了とし、今後は import や assertion message など、よりノイズ寄りで安全に閉じる整形候補の探索へ切り替える
 - 影響範囲: `tests/Feature/Api` 配下の test helper 方針、共通化探索の打ち止め判断、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、未使用 import、命名のずれ、assertion message の重複など「挙動に影響しないノイズ」を 1 file または 1 パターンずつ確認し、小さく閉じる
+
+### Route permission policy test の route 解決重複は 1 helper に寄せる
+
+- 背景: ノイズ寄りの整形候補を再探索すると、`ApiRoutePermissionPolicyTest` では route 取得と `Route [%s] was not found.` の assertion が 2 helper に重複していた。対象は 1 file に閉じており、route policy 自体の期待値や assertion message の意味は変えずに読み筋だけ整えられた
+- 決定事項: `tests/Feature/Api/ApiRoutePermissionPolicyTest.php` に `resolveRoute()` を追加し、route lookup と存在確認を 1 箇所へ寄せた。permission 有無の assertion helper 自体は分けたまま残し、各 test の意図が読める粒度は維持する
+- 影響範囲: `tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、route permission policy test の補助メソッド構成、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
