@@ -1321,3 +1321,10 @@ php artisan test
 - 決定事項: validation / forbidden response を起点にした helper 追加はここでいったん止める。今後はこの軸で新しい helper を機械的に足さず、別の明確な重複系列が見つかったときにだけ再開する
 - 影響範囲: `tests/Feature/Api` の validation / forbidden helper 追加判断、index 系 test の今後の探索起点、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、`PolicyIndexControllerTest` と `ChecklistIndexControllerTest` を起点に、index 系の success payload / meta assertion で残っている固定 shape を `ObjectIndexControllerTest` / `PlaybookIndexControllerTest` と同じ粒度で揃えられるかを見る
+
+### Policy / Checklist index controller test の payload と meta を helper に寄せる
+
+- 背景: 上の推奨アクションに沿って `PolicyIndexControllerTest` と `ChecklistIndexControllerTest` を `ObjectIndexControllerTest` / `PlaybookIndexControllerTest` と見比べると、前者 2 file だけ success response の `data` item shape と `meta` shape を本文に直接書いていた。index 系では fixture や filter 条件より response item / meta の固定 shape がノイズになりやすく、ここは既存の index 系と同じ粒度に揃える効果がはっきりしていた
+- 決定事項: `tests/Feature/Api/PolicyIndexControllerTest.php` に `policyPayload()` と `metaPayload()`、`tests/Feature/Api/ChecklistIndexControllerTest.php` に `checklistPayload()` と `metaPayload()` を追加し、success response の固定 shape を file 内 helper に寄せた。invalid filter validation は shared base ですでに共通化済みなので、そのまま維持した
+- 影響範囲: `tests/Feature/Api/PolicyIndexControllerTest.php`、`tests/Feature/Api/ChecklistIndexControllerTest.php`、index 系 success response assertion の helper 粒度、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、index 系の helper 粒度が揃った前提で、残る長めの file に本文を重くする固定 shape があるかを個別に見直す

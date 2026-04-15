@@ -39,36 +39,41 @@ class ChecklistIndexControllerTest extends ScopedIndexValidationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $serverChecklist->id,
-                        'scope_id' => $serverScope->id,
-                        'code' => 'server-checklist',
-                        'name' => 'Server Checklist',
-                    ],
-                    [
-                        'id' => $tenantChecklist->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-checklist',
-                        'name' => 'Tenant Checklist',
-                    ],
+                    $this->checklistPayload($serverChecklist->id, $serverScope->id, 'server-checklist', 'Server Checklist'),
+                    $this->checklistPayload($tenantChecklist->id, $tenantScope->id, 'tenant-checklist', 'Tenant Checklist'),
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(2),
             ]);
     }
 
     public function test_it_rejects_invalid_query_filters(): void
     {
         $this->assertIndexRejectsInvalidFilters('/api/checklists');
+    }
+
+    private function checklistPayload(int $id, int $scopeId, string $code, string $name): array
+    {
+        return [
+            'id' => $id,
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
+    }
+
+    private function metaPayload(int $total, array $filters = []): array
+    {
+        return [
+            'current_page' => 1,
+            'per_page' => 20,
+            'total' => $total,
+            'last_page' => 1,
+            'filters' => array_merge([
+                'scope_id' => null,
+                'code' => null,
+                'name' => null,
+                'sort' => null,
+            ], $filters),
+        ];
     }
 }

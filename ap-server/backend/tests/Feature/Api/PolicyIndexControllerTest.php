@@ -39,36 +39,41 @@ class PolicyIndexControllerTest extends ScopedIndexValidationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $serverPolicy->id,
-                        'scope_id' => $serverScope->id,
-                        'code' => 'server-policy',
-                        'name' => 'Server Policy',
-                    ],
-                    [
-                        'id' => $tenantPolicy->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-policy',
-                        'name' => 'Tenant Policy',
-                    ],
+                    $this->policyPayload($serverPolicy->id, $serverScope->id, 'server-policy', 'Server Policy'),
+                    $this->policyPayload($tenantPolicy->id, $tenantScope->id, 'tenant-policy', 'Tenant Policy'),
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(2),
             ]);
     }
 
     public function test_it_rejects_invalid_query_filters(): void
     {
         $this->assertIndexRejectsInvalidFilters('/api/policies');
+    }
+
+    private function policyPayload(int $id, int $scopeId, string $code, string $name): array
+    {
+        return [
+            'id' => $id,
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
+    }
+
+    private function metaPayload(int $total, array $filters = []): array
+    {
+        return [
+            'current_page' => 1,
+            'per_page' => 20,
+            'total' => $total,
+            'last_page' => 1,
+            'filters' => array_merge([
+                'scope_id' => null,
+                'code' => null,
+                'name' => null,
+                'sort' => null,
+            ], $filters),
+        ];
     }
 }
