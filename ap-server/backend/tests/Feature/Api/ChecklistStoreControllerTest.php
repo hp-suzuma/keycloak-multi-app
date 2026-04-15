@@ -54,6 +54,11 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Duplicated Checklist',
             ]);
 
+        $this->assertDuplicateCodeValidationResponse($response);
+    }
+
+    private function assertDuplicateCodeValidationResponse($response): void
+    {
         $response
             ->assertUnprocessable()
             ->assertExactJson([
