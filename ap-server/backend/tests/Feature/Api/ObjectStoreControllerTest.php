@@ -49,13 +49,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 'name' => 'Object B',
             ]);
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.create'],
-                'scope_id' => $forbiddenScope->id,
-            ]);
+        $this->assertForbiddenResponse($response, ['object.create'], $forbiddenScope->id);
     }
 
     public function test_it_creates_an_object_when_the_target_scope_is_accessible(): void
@@ -118,6 +112,20 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 'errors' => [
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
+            ]);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions, int $scopeId): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
+                'scope_id' => $scopeId,
             ]);
     }
 }

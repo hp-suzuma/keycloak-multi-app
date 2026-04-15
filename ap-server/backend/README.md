@@ -1069,3 +1069,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertNotFoundResponse()` と `assertForbiddenResponse()` を追加し、固定 payload の assertion を file 内 helper へ寄せた。成功系 response と validation error assertion は個別性が高いためそのまま残した
 - 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の error response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Object store controller test の forbidden response assertion を file 内 helper に寄せる
+
+- 背景: object 系の store test を確認すると、`ObjectStoreControllerTest` には固定の forbidden response payload が 1 箇所だけ残っていた。重複回数は多くないものの、近接 file と同じ error response の記述方針へそろえると、object 系 CRUD test の読み方が揃いやすかった
+- 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。validation error と成功 response は個別の期待値が主題なので、そのまま残した
+- 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の forbidden response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
