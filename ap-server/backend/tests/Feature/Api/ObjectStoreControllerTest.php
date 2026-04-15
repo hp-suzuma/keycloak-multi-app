@@ -105,14 +105,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 'name' => 'New Object',
             ]);
 
-        $response
-            ->assertUnprocessable()
-            ->assertExactJson([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'code' => ['The code has already been taken within the target scope.'],
-                ],
-            ]);
+        $this->assertDuplicateCodeValidationResponse($response);
     }
 
     /**
@@ -126,6 +119,18 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 'message' => 'Forbidden',
                 'required_permissions' => $requiredPermissions,
                 'scope_id' => $scopeId,
+            ]);
+    }
+
+    private function assertDuplicateCodeValidationResponse($response): void
+    {
+        $response
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Validation failed',
+                'errors' => [
+                    'code' => ['The code has already been taken within the target scope.'],
+                ],
             ]);
     }
 }

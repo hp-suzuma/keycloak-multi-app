@@ -1118,3 +1118,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ChecklistStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。作成成功系の response と DB assertion は個別性が高いためそのまま残した
 - 影響範囲: `tests/Feature/Api/ChecklistStoreControllerTest.php`、checklist store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Object store controller test の重複 code validation assertion も file 内 helper に寄せる
+
+- 背景: `ObjectStoreControllerTest` を確認すると、playbook / policy / checklist の store test と同型の重複 code validation payload をまだ直接書いていた。近接する store 系 test で failure assertion の置き方をそろえると、成功・forbidden・validation の切り替えが追いやすかった
+- 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。既存の `assertForbiddenResponse()` と成功系 assertion は役割が分かれているためそのまま残した
+- 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
