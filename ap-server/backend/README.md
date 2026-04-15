@@ -1020,3 +1020,10 @@ php artisan test
 - 決定事項: Bearer header の重複監視テーマは、現時点では追加の proactive 実装を行わず定常運用へ移す。監視テスト名も backend 全体を見ている実態に合わせ、意図が読み取りやすい名前へそろえる
 - 影響範囲: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の命名、backend test の Bearer header 運用方針、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、このテーマを広げ続けるのではなく、README の別テーマとして「挙動非変更で閉じる小さな重複」や「監視テストで拾いにくい新しいノイズ」を再探索する
+
+### Authorization API test の `assignRole()` 重複は親 test case に寄せる
+
+- 背景: Bearer header 監視テーマの次候補を再探索すると、`CreateAuthorizationApiTestCase` と `UpsertAuthorizationApiTestCase` には `assignRole()` の同型実装が残っていた。差分は AP user の準備方法だけで、scope 生成と role assignment 付与の流れは完全に一致していたため、ここは責務を崩さずに薄く共通化できた
+- 決定事項: `assignRole()` 本体は `AuthorizationApiTestCase` へ移し、子クラス側は `prepareAuthorizationUser()` だけを実装する形に整理した。`create` と `updateOrCreate` の使い分けは従来どおり各子クラスに残し、role 付与の主処理だけを親へ寄せた
+- 影響範囲: `tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Api/CreateAuthorizationApiTestCase.php`、`tests/Feature/Api/UpsertAuthorizationApiTestCase.php`、これらを継承する authorization 系 API test
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく「子クラス間で流れは同じだが差し替え点が 1 箇所だけ」の補助処理が他にないかを確認する。候補が無ければ、以降は import や assertion message などよりノイズ寄りの整形候補へ切り替える
