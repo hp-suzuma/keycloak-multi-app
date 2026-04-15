@@ -1076,3 +1076,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。validation error と成功 response は個別の期待値が主題なので、そのまま残した
 - 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の forbidden response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Playbook show controller test の forbidden response 記述を近接 file とそろえる
+
+- 背景: 次の 1 file ノイズ候補として `PlaybookShowControllerTest` を見ると、forbidden response は 1 箇所だけだったが、`ObjectShowControllerTest` など近い show 系 test では file 内 helper に寄せる書き方へそろい始めていた。回数は少なくても、近接シリーズ内で error response の書き味をそろえると読み替えコストを下げやすかった
+- 決定事項: `tests/Feature/Api/PlaybookShowControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。成功系の `data` assertion は個別性が高いためそのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、playbook show test の forbidden response 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える

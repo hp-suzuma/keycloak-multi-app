@@ -26,12 +26,7 @@ class PlaybookShowControllerTest extends UpsertAuthorizationApiTestCase
 
         $response = $this->getJson('/api/playbooks/'.$playbook->id);
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.read'],
-            ]);
+        $this->assertForbiddenResponse($response, ['object.read']);
     }
 
     public function test_it_returns_the_playbook_when_the_scope_is_accessible(): void
@@ -62,6 +57,19 @@ class PlaybookShowControllerTest extends UpsertAuthorizationApiTestCase
                     'code' => 'tenant-playbook',
                     'name' => 'Tenant Playbook',
                 ],
+            ]);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
             ]);
     }
 }
