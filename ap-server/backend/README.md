@@ -1244,3 +1244,24 @@ php artisan test
 - 決定事項: 現時点の show/store/update 整理はここでいったん止める。今後は新しい重複候補を機械的に追わず、本文の読みやすさが明確に改善する長い file が見つかったときだけ再開する
 - 影響範囲: `tests/Feature/Api` の helper 追加判断、show/store/update 整理シリーズの継続条件、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、このシリーズを続けるより、別の明確な読みづらさや保守コストの高い file を起点に新しい小タスクを切る
+
+### Object index controller test の object payload assertion を file 内 helper に寄せる
+
+- 背景: show/store/update の整理を打ち止めにした後、別の読みづらさが強い file を見直すと、`ObjectIndexControllerTest` は 300 行超の中で `data` 配列内の object shape が何度も繰り返されていた。index 系では filter / pagination 条件の差分を本文で追いたいので、個々の object payload を helper に寄せる効果がはっきりあった
+- 決定事項: `tests/Feature/Api/ObjectIndexControllerTest.php` に `objectPayload()` を追加し、response assertion 内の `id` / `scope_id` / `code` / `name` を持つ object shape を file 内 helper に寄せた。fixture 作成や `metaPayload()`、filter 条件はテスト意図の中心なのでそのまま残した
+- 影響範囲: `tests/Feature/Api/ObjectIndexControllerTest.php`、object index test の response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、同じく長めの index / authorization 系 file を見ながら、response payload の固定 shape が本文の見通しを下げている箇所だけを小さく寄せる
+
+### Playbook index controller test の playbook payload assertion も file 内 helper に寄せる
+
+- 背景: `ObjectIndexControllerTest` の次に近い粒度の file を見ると、`PlaybookIndexControllerTest` でも `data` 配列内の playbook shape が複数回繰り返されていた。index 系では fixture や filter 条件より response item の固定 shape の方がノイズになりやすいため、同じパターンで寄せると読み筋を揃えやすかった
+- 決定事項: `tests/Feature/Api/PlaybookIndexControllerTest.php` に `playbookPayload()` を追加し、response assertion 内の `id` / `scope_id` / `code` / `name` を持つ playbook shape を file 内 helper に寄せた。forbidden response helper と `metaPayload()`、filter 条件は役割が分かれているため、そのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookIndexControllerTest.php`、playbook index test の response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、authorization 系の長めの assertion を見直しつつ、固定 shape の繰り返しが本文の見通しを下げている箇所だけを小さく寄せる
+
+### Me authorization controller test の scope / role assertion を file 内 helper に寄せる
+
+- 背景: authorization 系の長めの assertion を見直すと、`MeAuthorizationControllerTest` では assignment ごとの差分よりも `scope` と `role` の固定 shape が目に入りやすく、1 つの長い response assertion の見通しを下げていた。`currentUserPayload()` と `permissionPayload()` はすでに分かれていたので、その隣で `scope` / `role` も同じ粒度に揃えるのが自然だった
+- 決定事項: `tests/Feature/Api/MeAuthorizationControllerTest.php` に `scopePayload()` と `rolePayload()` を追加し、assignment 内の固定 shape を file 内 helper に寄せた。authorization 全体や assignment 全体は test 意図の中心なので helper 化せず、そのまま残した
+- 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、me authorization test の response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、authorization / middleware 系 file を見ながら、response 全体ではなく部分的な固定 shape だけが本文の見通しを下げている箇所を同じ粒度で小さく寄せる

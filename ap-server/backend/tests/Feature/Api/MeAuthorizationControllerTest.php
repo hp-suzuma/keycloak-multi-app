@@ -81,20 +81,8 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                     'keycloak_sub' => 'keycloak-user-1',
                     'assignments' => [
                         [
-                            'scope' => [
-                                'id' => $serverScope->id,
-                                'layer' => 'server',
-                                'code' => 'srv-1',
-                                'name' => 'Server 1',
-                                'parent_scope_id' => null,
-                            ],
-                            'role' => [
-                                'id' => $serverAdminRole->id,
-                                'slug' => 'server_admin',
-                                'name' => 'Server Admin',
-                                'scope_layer' => 'server',
-                                'permission_role' => 'admin',
-                            ],
+                            'scope' => $this->scopePayload($serverScope->id, 'server', 'srv-1', 'Server 1'),
+                            'role' => $this->rolePayload($serverAdminRole->id, 'server_admin', 'Server Admin', 'server', 'admin'),
                             'permissions' => [
                                 $this->permissionPayload('object.read'),
                                 $this->permissionPayload('object.update'),
@@ -104,20 +92,8 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                             ],
                         ],
                         [
-                            'scope' => [
-                                'id' => $tenantScope->id,
-                                'layer' => 'tenant',
-                                'code' => 'tenant-a',
-                                'name' => 'Tenant A',
-                                'parent_scope_id' => $serverScope->id,
-                            ],
-                            'role' => [
-                                'id' => $tenantViewerRole->id,
-                                'slug' => 'tenant_viewer',
-                                'name' => 'Tenant Viewer',
-                                'scope_layer' => 'tenant',
-                                'permission_role' => 'viewer',
-                            ],
+                            'scope' => $this->scopePayload($tenantScope->id, 'tenant', 'tenant-a', 'Tenant A', $serverScope->id),
+                            'role' => $this->rolePayload($tenantViewerRole->id, 'tenant_viewer', 'Tenant Viewer', 'tenant', 'viewer'),
                             'permissions' => [
                                 $this->permissionPayload('object.read'),
                             ],
@@ -168,6 +144,38 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
             'id' => $permission->id,
             'slug' => $permission->slug,
             'name' => $permission->name,
+        ];
+    }
+
+    private function scopePayload(
+        int $id,
+        string $layer,
+        string $code,
+        string $name,
+        ?int $parentScopeId = null,
+    ): array {
+        return [
+            'id' => $id,
+            'layer' => $layer,
+            'code' => $code,
+            'name' => $name,
+            'parent_scope_id' => $parentScopeId,
+        ];
+    }
+
+    private function rolePayload(
+        int $id,
+        string $slug,
+        string $name,
+        string $scopeLayer,
+        string $permissionRole,
+    ): array {
+        return [
+            'id' => $id,
+            'slug' => $slug,
+            'name' => $name,
+            'scope_layer' => $scopeLayer,
+            'permission_role' => $permissionRole,
         ];
     }
 

@@ -76,18 +76,8 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $serverObject->id,
-                        'scope_id' => $serverScope->id,
-                        'code' => 'srv-object',
-                        'name' => 'Server Object',
-                    ],
-                    [
-                        'id' => $tenantObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-object',
-                        'name' => 'Tenant Object',
-                    ],
+                    $this->objectPayload($serverObject->id, $serverScope->id, 'srv-object', 'Server Object'),
+                    $this->objectPayload($tenantObject->id, $tenantScope->id, 'tenant-object', 'Tenant Object'),
                 ],
                 'meta' => $this->metaPayload(2),
             ]);
@@ -136,12 +126,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $tenantObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-a-object',
-                        'name' => 'Tenant A Object',
-                    ],
+                    $this->objectPayload($tenantObject->id, $tenantScope->id, 'tenant-a-object', 'Tenant A Object'),
                 ],
                 'meta' => $this->metaPayload(1),
             ]);
@@ -189,12 +174,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $managedObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'target-object',
-                        'name' => 'Target Object',
-                    ],
+                    $this->objectPayload($managedObject->id, $tenantScope->id, 'target-object', 'Target Object'),
                 ],
                 'meta' => $this->metaPayload(1, [
                     'scope_id' => $tenantScope->id,
@@ -239,12 +219,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $thirdObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'object-3',
-                        'name' => 'Object 3',
-                    ],
+                    $this->objectPayload($thirdObject->id, $tenantScope->id, 'object-3', 'Object 3'),
                 ],
                 'meta' => $this->metaPayload(3, currentPage: 2, perPage: 2, lastPage: 2),
             ]);
@@ -286,18 +261,8 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $firstSortedObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'aaa',
-                        'name' => 'Target Alpha',
-                    ],
-                    [
-                        'id' => $secondSortedObject->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'bbb',
-                        'name' => 'Target Zebra',
-                    ],
+                    $this->objectPayload($firstSortedObject->id, $tenantScope->id, 'aaa', 'Target Alpha'),
+                    $this->objectPayload($secondSortedObject->id, $tenantScope->id, 'bbb', 'Target Zebra'),
                 ],
                 'meta' => $this->metaPayload(2, [
                     'name' => 'Target',
@@ -309,6 +274,16 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
     public function test_it_rejects_invalid_query_filters(): void
     {
         $this->assertIndexRejectsInvalidFilters('/api/objects');
+    }
+
+    private function objectPayload(int $id, int $scopeId, string $code, string $name): array
+    {
+        return [
+            'id' => $id,
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
     }
 
     private function metaPayload(

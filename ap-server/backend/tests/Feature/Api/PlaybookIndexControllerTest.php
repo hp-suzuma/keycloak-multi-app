@@ -59,18 +59,8 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $serverPlaybook->id,
-                        'scope_id' => $serverScope->id,
-                        'code' => 'server-runbook',
-                        'name' => 'Server Runbook',
-                    ],
-                    [
-                        'id' => $tenantPlaybook->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'tenant-runbook',
-                        'name' => 'Tenant Runbook',
-                    ],
+                    $this->playbookPayload($serverPlaybook->id, $serverScope->id, 'server-runbook', 'Server Runbook'),
+                    $this->playbookPayload($tenantPlaybook->id, $tenantScope->id, 'tenant-runbook', 'Tenant Runbook'),
                 ],
                 'meta' => $this->metaPayload(2),
             ]);
@@ -112,18 +102,8 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    [
-                        'id' => $firstPlaybook->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'alpha-playbook',
-                        'name' => 'Target Alpha',
-                    ],
-                    [
-                        'id' => $secondPlaybook->id,
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'zebra-playbook',
-                        'name' => 'Target Zebra',
-                    ],
+                    $this->playbookPayload($firstPlaybook->id, $tenantScope->id, 'alpha-playbook', 'Target Alpha'),
+                    $this->playbookPayload($secondPlaybook->id, $tenantScope->id, 'zebra-playbook', 'Target Zebra'),
                 ],
                 'meta' => $this->metaPayload(2, [
                     'scope_id' => $tenantScope->id,
@@ -149,6 +129,16 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
                 'message' => 'Forbidden',
                 'required_permissions' => $requiredPermissions,
             ]);
+    }
+
+    private function playbookPayload(int $id, int $scopeId, string $code, string $name): array
+    {
+        return [
+            'id' => $id,
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
     }
 
     private function metaPayload(int $total, array $filters = []): array
