@@ -1286,3 +1286,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookStoreControllerTest.php`、`tests/Feature/Api/PolicyStoreControllerTest.php`、`tests/Feature/Api/ChecklistStoreControllerTest.php` にそれぞれ `assertPlaybookResponse()` / `assertPolicyResponse()` / `assertChecklistResponse()` を追加し、成功 response の `id` / `scope_id` / `code` / `name` shape だけを helper に寄せた。duplicate validation helper と request payload helper は既存の役割のまま維持した
 - 影響範囲: 上記 3 file の success response assertion 記述、store 系 resource test の helper 粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、resource ごとの store / update / show を横断して、同じ response item shape が 2 回以上出る小さな系列を優先して揃える
+
+### show 系 3 file も成功 response helper で横並びを揃える
+
+- 背景: 上の方針に沿って `show` 系を横断で見直すと、`PlaybookShowControllerTest`、`PolicyShowControllerTest`、`ChecklistShowControllerTest` は file 単体では短くても、3 resource で同じ `data` object shape が繰り返されていた。以前は単独 file 判断で show 系 helper を増やさなかったが、今回は「小さな系列を横断して揃える」段階に入ったため、ここは基準に合う重複になった
+- 決定事項: 上記 3 file にそれぞれ `assertPlaybookResponse()` / `assertPolicyResponse()` / `assertChecklistResponse()` を追加し、成功 response の `id` / `scope_id` / `code` / `name` shape だけを helper に寄せた。`PlaybookShowControllerTest` の `assertForbiddenResponse()` は既存のまま残し、show 系でも response helper の粒度を store 系と揃えた
+- 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、`tests/Feature/Api/PolicyShowControllerTest.php`、`tests/Feature/Api/ChecklistShowControllerTest.php`、show 系 resource test の helper 粒度、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、update 系でも resource を横断して同じ success response shape が残っている系列を優先して揃える

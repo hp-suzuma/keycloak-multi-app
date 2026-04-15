@@ -48,16 +48,7 @@ class PlaybookShowControllerTest extends UpsertAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-playbook-show')
             ->getJson('/api/playbooks/'.$playbook->id);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $playbook->id,
-                    'scope_id' => $tenantScope->id,
-                    'code' => 'tenant-playbook',
-                    'name' => 'Tenant Playbook',
-                ],
-            ]);
+        $this->assertPlaybookResponse($response, $playbook->id, $tenantScope->id, 'tenant-playbook', 'Tenant Playbook');
     }
 
     /**
@@ -70,6 +61,20 @@ class PlaybookShowControllerTest extends UpsertAuthorizationApiTestCase
             ->assertExactJson([
                 'message' => 'Forbidden',
                 'required_permissions' => $requiredPermissions,
+            ]);
+    }
+
+    private function assertPlaybookResponse($response, int $playbookId, int $scopeId, string $code, string $name): void
+    {
+        $response
+            ->assertOk()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $playbookId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
+                ],
             ]);
     }
 }

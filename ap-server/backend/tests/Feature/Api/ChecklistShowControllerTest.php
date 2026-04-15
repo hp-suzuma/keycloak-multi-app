@@ -22,14 +22,19 @@ class ChecklistShowControllerTest extends UpsertAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-checklist-show')
             ->getJson('/api/checklists/'.$checklist->id);
 
+        $this->assertChecklistResponse($response, $checklist->id, $scope->id, 'tenant-checklist', 'Tenant Checklist');
+    }
+
+    private function assertChecklistResponse($response, int $checklistId, int $scopeId, string $code, string $name): void
+    {
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $checklist->id,
-                    'scope_id' => $scope->id,
-                    'code' => 'tenant-checklist',
-                    'name' => 'Tenant Checklist',
+                    'id' => $checklistId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }

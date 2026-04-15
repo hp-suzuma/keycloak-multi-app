@@ -22,14 +22,19 @@ class PolicyShowControllerTest extends UpsertAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-policy-show')
             ->getJson('/api/policies/'.$policy->id);
 
+        $this->assertPolicyResponse($response, $policy->id, $scope->id, 'tenant-policy', 'Tenant Policy');
+    }
+
+    private function assertPolicyResponse($response, int $policyId, int $scopeId, string $code, string $name): void
+    {
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $policy->id,
-                    'scope_id' => $scope->id,
-                    'code' => 'tenant-policy',
-                    'name' => 'Tenant Policy',
+                    'id' => $policyId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }
