@@ -1188,3 +1188,10 @@ php artisan test
 - 決定事項: index 系の `metaPayload()` 展開は object/playbook までで止める。checklist/policy のように `meta` が 1 回しか出ない file には helper を追加せず、次は index 以外も含めて「1 file 内で shape だけが 2 回以上重複している assertion」を優先して探す
 - 影響範囲: `tests/Feature/Api` の index test 整理方針、`ChecklistIndexControllerTest` / `PolicyIndexControllerTest` の helper 採用判断、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、index 系から少し離れて、show/store/update の長い response assertion や payload 配列で shape だけが複数回重なる 1 file 候補を再探索する
+
+### Object update controller test の success response assertion を file 内 helper に寄せる
+
+- 背景: index 系の区切り後に `ObjectUpdateControllerTest` を見直すと、更新成功時と scope 移動成功時で `data` の shape は同じなのに `assertExactJson()` が 2 回並んでいた。playbook/checklist update と同じく、本文では更新内容の差分だけを追える方が読みやすかった
+- 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertObjectResponse()` を追加し、success response assertion を file 内 helper に寄せた。既存の forbidden / not found / duplicate validation helper と役割が分かれるようにし、DB assertion は各 test に残した
+- 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の success response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、show/store/update を中心に、同じ shape の success response や payload 配列が 1 file 内で 2 回以上出る候補を引き続き小さく整える

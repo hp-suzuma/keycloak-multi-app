@@ -118,16 +118,13 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Object C',
             ]);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $managedObject->id,
-                    'scope_id' => $tenantScope->id,
-                    'code' => 'updated-object-c',
-                    'name' => 'Updated Object C',
-                ],
-            ]);
+        $this->assertObjectResponse(
+            $response,
+            $managedObject->id,
+            $tenantScope->id,
+            'updated-object-c',
+            'Updated Object C',
+        );
 
         $this->assertSame('Updated Object C', $managedObject->fresh()->name);
         $this->assertSame('updated-object-c', $managedObject->fresh()->code);
@@ -162,16 +159,13 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Moved Object',
             ]);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $managedObject->id,
-                    'scope_id' => $targetScope->id,
-                    'code' => 'object-move',
-                    'name' => 'Moved Object',
-                ],
-            ]);
+        $this->assertObjectResponse(
+            $response,
+            $managedObject->id,
+            $targetScope->id,
+            'object-move',
+            'Moved Object',
+        );
 
         $this->assertDatabaseHas('objects', [
             'id' => $managedObject->id,
@@ -266,6 +260,20 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'message' => 'Validation failed',
                 'errors' => [
                     'code' => ['The code has already been taken within the target scope.'],
+                ],
+            ]);
+    }
+
+    private function assertObjectResponse($response, int $objectId, int $scopeId, string $code, string $name): void
+    {
+        $response
+            ->assertOk()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $objectId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }
