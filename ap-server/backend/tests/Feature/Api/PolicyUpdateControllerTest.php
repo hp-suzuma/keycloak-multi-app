@@ -26,16 +26,7 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Policy',
             ]);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $policy->id,
-                    'scope_id' => $scope->id,
-                    'code' => 'updated-policy',
-                    'name' => 'Updated Policy',
-                ],
-            ]);
+        $this->assertPolicyResponse($response, $policy->id, $scope->id, 'updated-policy', 'Updated Policy');
     }
 
     public function test_it_rejects_moving_a_policy_to_another_scope(): void
@@ -69,6 +60,20 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'message' => 'Validation failed',
                 'errors' => [
                     'scope_id' => ['Policy scope cannot be changed after creation.'],
+                ],
+            ]);
+    }
+
+    private function assertPolicyResponse($response, int $policyId, int $scopeId, string $code, string $name): void
+    {
+        $response
+            ->assertOk()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $policyId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }

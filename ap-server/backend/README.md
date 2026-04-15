@@ -1293,3 +1293,10 @@ php artisan test
 - 決定事項: 上記 3 file にそれぞれ `assertPlaybookResponse()` / `assertPolicyResponse()` / `assertChecklistResponse()` を追加し、成功 response の `id` / `scope_id` / `code` / `name` shape だけを helper に寄せた。`PlaybookShowControllerTest` の `assertForbiddenResponse()` は既存のまま残し、show 系でも response helper の粒度を store 系と揃えた
 - 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、`tests/Feature/Api/PolicyShowControllerTest.php`、`tests/Feature/Api/ChecklistShowControllerTest.php`、show 系 resource test の helper 粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、update 系でも resource を横断して同じ success response shape が残っている系列を優先して揃える
+
+### update 系は Policy を揃えて横並びを完了する
+
+- 背景: `update` 系を resource 横断で見ると、`ObjectUpdateControllerTest`、`PlaybookUpdateControllerTest`、`ChecklistUpdateControllerTest` はすでに success response helper を持っていた一方、`PolicyUpdateControllerTest` だけが success 時の `data` object shape を本文に直接書いたままだった。系列としては最後の 1 file だけ粒度がずれていたため、ここを合わせると update 系の読み筋が揃った
+- 決定事項: `tests/Feature/Api/PolicyUpdateControllerTest.php` に `assertPolicyResponse()` を追加し、success response の `id` / `scope_id` / `code` / `name` shape を helper に寄せた。`assertScopeImmutableValidationResponse()` と `createTenantScope()` は既存の責務のまま維持し、update 系 helper の粒度を他 resource と合わせた
+- 影響範囲: `tests/Feature/Api/PolicyUpdateControllerTest.php`、update 系 resource test の success response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、resource 横断の系列整理はいったん打ち止めにして、validation や forbidden response の重複が長めの file で本文を重くしている箇所があるかを探す
