@@ -1153,3 +1153,10 @@ php artisan test
 - 決定事項: success response helper の横展開は、同じ shape が 1 file 内で明確に重複している update 系までで止める。単発の success assertion や shared trait の短い validation assertion には追加 helper を入れず、次は未使用 import、命名のずれ、message 文言の重複といった別種のノイズ探索へ戻す
 - 影響範囲: `tests/Feature/Api` の test 整理方針、update/store/show/delete/index まわりの helper 採用判断、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、unused import や命名のずれを優先して再走査し、helper 追加ではなく削除・命名統一で閉じる 1 file 候補を選ぶ
+
+### Me authorization controller test の current_user payload を file 内 helper に寄せる
+
+- 背景: unused import の再走査では明確な削除候補が見つからなかったため、次に `MeAuthorizationControllerTest` を見直した。`current_user` の payload は 2 箇所で同じ shape を保っており、authorization 本体の配列が長い file ではこの小さな共通化だけでも本文の見通しを少し保ちやすかった
+- 決定事項: `tests/Feature/Api/MeAuthorizationControllerTest.php` に `currentUserPayload()` を追加し、`current_user` の固定 shape を file 内 helper に寄せた。assignment / permission payload はテスト意図の中心で個別性が高いため、そのまま残した
+- 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、me authorization test の current_user assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、unused import の再走査を続けつつ、今回と同じく長い assertion の中で shape だけが重複している 1 file 候補があれば小さく整える

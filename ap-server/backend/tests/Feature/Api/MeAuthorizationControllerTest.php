@@ -76,11 +76,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-1',
-                    'name' => 'kc-user',
-                    'email' => 'kc-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-1', 'kc-user', 'kc-user@example.com'),
                 'authorization' => [
                     'keycloak_sub' => 'keycloak-user-1',
                     'assignments' => [
@@ -155,11 +151,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-2',
-                    'name' => 'kc-user-2',
-                    'email' => 'kc-user-2@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-2', 'kc-user-2', 'kc-user-2@example.com'),
                 'authorization' => [
                     'keycloak_sub' => 'keycloak-user-2',
                     'assignments' => [],
@@ -176,6 +168,15 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
             'id' => $permission->id,
             'slug' => $permission->slug,
             'name' => $permission->name,
+        ];
+    }
+
+    private function currentUserPayload(string $id, string $name, string $email): array
+    {
+        return [
+            'id' => $id,
+            'name' => $name,
+            'email' => $email,
         ];
     }
 }
