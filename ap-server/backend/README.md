@@ -1062,3 +1062,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectDeleteControllerTest.php` に `assertNotFoundResponse()` と `assertForbiddenResponse()` を追加し、固定 payload の assertion を file 内 helper へ寄せた。delete 成功系は個別の永続化確認が主目的なので、そのまま残した
 - 影響範囲: `tests/Feature/Api/ObjectDeleteControllerTest.php`、object delete test の error response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Object update controller test の固定 error response assertion も file 内 helper に寄せる
+
+- 背景: object 系の近接 file を続けて確認すると、`ObjectUpdateControllerTest` にも `Not Found` と `Forbidden` の固定 error response assertion が複数残っていた。更新成功系や validation error は個別差分が大きい一方、error response は payload 形状が揃っており、ここだけを切り出すと 1 file に閉じて安全に整えられた
+- 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertNotFoundResponse()` と `assertForbiddenResponse()` を追加し、固定 payload の assertion を file 内 helper へ寄せた。成功系 response と validation error assertion は個別性が高いためそのまま残した
+- 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の error response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える

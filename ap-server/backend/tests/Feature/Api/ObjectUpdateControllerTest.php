@@ -62,11 +62,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Name',
             ]);
 
-        $response
-            ->assertNotFound()
-            ->assertExactJson([
-                'message' => 'Not Found',
-            ]);
+        $this->assertNotFoundResponse($response);
     }
 
     public function test_it_returns_forbidden_when_the_object_scope_is_not_accessible(): void
@@ -96,13 +92,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Object B',
             ]);
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.update'],
-                'scope_id' => $forbiddenScope->id,
-            ]);
+        $this->assertForbiddenResponse($response, ['object.update'], $forbiddenScope->id);
     }
 
     public function test_it_updates_the_object_when_the_scope_is_accessible(): void
@@ -218,13 +208,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'scope_id' => $targetScope->id,
             ]);
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.create'],
-                'scope_id' => $targetScope->id,
-            ]);
+        $this->assertForbiddenResponse($response, ['object.create'], $targetScope->id);
     }
 
     public function test_it_returns_validation_errors_when_the_target_scope_and_code_are_duplicated(): void
@@ -255,6 +239,29 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'errors' => [
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
+            ]);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions, int $scopeId): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
+                'scope_id' => $scopeId,
+            ]);
+    }
+
+    private function assertNotFoundResponse($response): void
+    {
+        $response
+            ->assertNotFound()
+            ->assertExactJson([
+                'message' => 'Not Found',
             ]);
     }
 }
