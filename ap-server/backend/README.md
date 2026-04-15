@@ -1146,3 +1146,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ChecklistUpdateControllerTest.php` に `assertChecklistResponse()` を追加し、success response assertion を file 内 helper に寄せた。今回は直近で同じ整理をした playbook update と粒度をそろえる範囲に留め、他 file への一括展開は行わない
 - 影響範囲: `tests/Feature/Api/ChecklistUpdateControllerTest.php`、checklist update test の success response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### success response helper の近接展開をいったんここで止める
+
+- 背景: `PlaybookUpdateControllerTest` と `ChecklistUpdateControllerTest` では同じ shape の success response が 1 file 内で 2 回出ていたため helper 化の効果があった。一方で、その後 `PolicyUpdateControllerTest`、store/show/delete 周辺、`ScopedIndexValidationApiTestCase` と `InteractsWithScopedIndexValidation` まで見直すと、残りは 1 回しか出ない assertion か、shared helper 側ですでに十分短いものが大半だった
+- 決定事項: success response helper の横展開は、同じ shape が 1 file 内で明確に重複している update 系までで止める。単発の success assertion や shared trait の短い validation assertion には追加 helper を入れず、次は未使用 import、命名のずれ、message 文言の重複といった別種のノイズ探索へ戻す
+- 影響範囲: `tests/Feature/Api` の test 整理方針、update/store/show/delete/index まわりの helper 採用判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、unused import や命名のずれを優先して再走査し、helper 追加ではなく削除・命名統一で閉じる 1 file 候補を選ぶ
