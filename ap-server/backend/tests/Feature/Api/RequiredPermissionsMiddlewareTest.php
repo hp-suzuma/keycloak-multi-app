@@ -24,12 +24,7 @@ class RequiredPermissionsMiddlewareTest extends CreateAuthorizationApiTestCase
     {
         $response = $this->getJson('/api/test/permissions/read');
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.read'],
-            ]);
+        $this->assertForbiddenResponse($response, ['object.read']);
     }
 
     public function test_it_allows_a_user_with_the_required_permission(): void
@@ -39,11 +34,7 @@ class RequiredPermissionsMiddlewareTest extends CreateAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-1')
             ->getJson('/api/test/permissions/read');
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'status' => 'ok',
-            ]);
+        $this->assertOkStatusResponse($response);
     }
 
     public function test_it_returns_forbidden_when_any_required_permission_is_missing(): void
@@ -53,12 +44,7 @@ class RequiredPermissionsMiddlewareTest extends CreateAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-2')
             ->getJson('/api/test/permissions/read-execute');
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.read', 'object.execute'],
-            ]);
+        $this->assertForbiddenResponse($response, ['object.read', 'object.execute']);
     }
 
     public function test_it_allows_a_user_when_all_required_permissions_are_present(): void
@@ -68,6 +54,24 @@ class RequiredPermissionsMiddlewareTest extends CreateAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-3')
             ->getJson('/api/test/permissions/read-execute');
 
+        $this->assertOkStatusResponse($response);
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
+            ]);
+    }
+
+    private function assertOkStatusResponse($response): void
+    {
         $response
             ->assertOk()
             ->assertExactJson([

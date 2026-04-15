@@ -1041,3 +1041,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ApiRoutePermissionPolicyTest.php` に `resolveRoute()` を追加し、route lookup と存在確認を 1 箇所へ寄せた。permission 有無の assertion helper 自体は分けたまま残し、各 test の意図が読める粒度は維持する
 - 影響範囲: `tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、route permission policy test の補助メソッド構成、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Required permissions middleware test の response assertion 重複を 1 file で整理する
+
+- 背景: 次のノイズ候補を再探索すると、`RequiredPermissionsMiddlewareTest` では `['status' => 'ok']` の成功 response と `message + required_permissions` の forbidden response が file 内で 2 回ずつ重複していた。middleware 挙動そのものではなく assertion の書き方だけが重なっていたため、1 file に閉じた整形として安全に扱えた
+- 決定事項: `tests/Feature/Api/RequiredPermissionsMiddlewareTest.php` に `assertOkStatusResponse()` と `assertForbiddenResponse()` を追加し、同型 assertion を file 内 helper へ寄せた。route 定義や permission payload の期待値は変更せず、test 本体では「誰が通るか / 弾かれるか」が先に読める形を優先した
+- 影響範囲: `tests/Feature/Api/RequiredPermissionsMiddlewareTest.php`、required permissions middleware test の assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
