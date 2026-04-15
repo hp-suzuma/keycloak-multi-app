@@ -1181,3 +1181,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookIndexControllerTest.php` に `metaPayload()` を追加し、共通の `meta` assertion を file 内 helper に寄せた。`data` 配列と forbidden response helper はテスト意図の中心なのでそのまま残した
 - 影響範囲: `tests/Feature/Api/PlaybookIndexControllerTest.php`、playbook index test の meta assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、index 系の残り file でも `meta` の繰り返しが helper 化に見合うかを見つつ、同じく 1 file 単位で小さく整える
+
+### index 系の meta helper 展開を object/playbook で止める
+
+- 背景: `ObjectIndexControllerTest` と `PlaybookIndexControllerTest` では `meta` の shape が 1 file 内で複数回繰り返されていたため helper 化の効果があった。一方で、その後 `ChecklistIndexControllerTest` と `PolicyIndexControllerTest` を見直すと、`meta` assertion は実質 1 回だけで、invalid filter 側は shared trait に集約されていた
+- 決定事項: index 系の `metaPayload()` 展開は object/playbook までで止める。checklist/policy のように `meta` が 1 回しか出ない file には helper を追加せず、次は index 以外も含めて「1 file 内で shape だけが 2 回以上重複している assertion」を優先して探す
+- 影響範囲: `tests/Feature/Api` の index test 整理方針、`ChecklistIndexControllerTest` / `PolicyIndexControllerTest` の helper 採用判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、index 系から少し離れて、show/store/update の長い response assertion や payload 配列で shape だけが複数回重なる 1 file 候補を再探索する
