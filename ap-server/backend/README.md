@@ -1139,3 +1139,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookUpdateControllerTest.php` に `assertPlaybookResponse()` を追加し、success response assertion を file 内 helper に寄せた。store 系や index 系のようにレスポンス差分が大きい file には広げず、同じ shape が 1 file 内で繰り返されるケースだけに留める
 - 影響範囲: `tests/Feature/Api/PlaybookUpdateControllerTest.php`、playbook update test の success response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Checklist update controller test の success response assertion も file 内 helper に寄せる
+
+- 背景: `ChecklistUpdateControllerTest` も `PlaybookUpdateControllerTest` と同じく、更新成功時と scope 移動成功時で response の shape は同じなのに `assertExactJson()` が 2 回並んでいた。差し替え点だけを本文で読めるようにした方が、近接 file 間で見通しをそろえやすかった
+- 決定事項: `tests/Feature/Api/ChecklistUpdateControllerTest.php` に `assertChecklistResponse()` を追加し、success response assertion を file 内 helper に寄せた。今回は直近で同じ整理をした playbook update と粒度をそろえる範囲に留め、他 file への一括展開は行わない
+- 影響範囲: `tests/Feature/Api/ChecklistUpdateControllerTest.php`、checklist update test の success response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える

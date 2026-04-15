@@ -26,16 +26,13 @@ class ChecklistUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Updated Checklist',
             ]);
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $checklist->id,
-                    'scope_id' => $scope->id,
-                    'code' => 'updated-checklist',
-                    'name' => 'Updated Checklist',
-                ],
-            ]);
+        $this->assertChecklistResponse(
+            $response,
+            $checklist->id,
+            $scope->id,
+            'updated-checklist',
+            'Updated Checklist',
+        );
     }
 
     public function test_it_moves_the_checklist_when_the_user_can_update_current_scope_and_create_in_target_scope(): void
@@ -66,14 +63,25 @@ class ChecklistUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Moved Checklist',
             ]);
 
+        $this->assertChecklistResponse(
+            $response,
+            $checklist->id,
+            $targetScope->id,
+            'checklist-a',
+            'Moved Checklist',
+        );
+    }
+
+    private function assertChecklistResponse($response, int $checklistId, int $scopeId, string $code, string $name): void
+    {
         $response
             ->assertOk()
             ->assertExactJson([
                 'data' => [
-                    'id' => $checklist->id,
-                    'scope_id' => $targetScope->id,
-                    'code' => 'checklist-a',
-                    'name' => 'Moved Checklist',
+                    'id' => $checklistId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }
