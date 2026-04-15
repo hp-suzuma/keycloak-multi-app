@@ -1006,3 +1006,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の検知パターンを広げ、`withHeader()` と `withHeaders()` の両方で Bearer header の連結・文字列補間を監視対象に含めた。今後は「Authorization header をその場で組み立てているか」を基準に helper 利用へ寄せる
 - 影響範囲: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の失敗条件、`tests/Feature/Api` 配下での Bearer token 付与方法、`ap-server/backend/README.md`
 - 次の推奨アクション: 今後監視テストが落ちたときは、まず直書きを `withAccessToken()` か `withBearerToken()` へ置換する。もしそのどちらでも表現できない新しい Bearer 付与パターンが出た場合だけ、helper 側の責務拡張を README 更新とセットで検討する
+
+### Bearer header の重複監視は backend test 全体へ広げる
+
+- 背景: `tests/Feature/Api` 向けの監視を入れたあとに backend の test 全体を再点検すると、Bearer Authorization header の直書きは helper 実装である `tests/Concerns/InteractsWithKeycloakTokens.php` に限られていた。今後は API 以外の test が増える可能性もあるため、監視を `Feature/Api` のみへ閉じる理由が薄くなっていた
+- 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の走査対象を `base_path('tests')` へ広げ、`tests/Concerns` だけを除外する形にした。これにより backend test 全体で Bearer header のその場組み立てを検知しつつ、helper 実装自身の責務は監視対象から外す
+- 影響範囲: `ap-server/backend/tests` 配下の Bearer token 利用方針、`tests/Feature/Api/BearerTokenHelperUsageTest.php` の監視範囲、`ap-server/backend/README.md`
+- 次の推奨アクション: 今後 backend test を追加して監視テストが落ちた場合は、まず `withAccessToken()` か `withBearerToken()` への置換で解消する。もし `tests/Concerns` 以外で Bearer header の組み立てを残す必要が出た場合だけ、その理由と責務境界を README に記録してから例外扱いを検討する

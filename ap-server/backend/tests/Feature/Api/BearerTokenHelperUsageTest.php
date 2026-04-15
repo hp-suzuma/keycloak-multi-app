@@ -10,7 +10,7 @@ class BearerTokenHelperUsageTest extends TestCase
 {
     public function test_feature_api_tests_do_not_inline_bearer_authorization_headers(): void
     {
-        $apiTestDirectory = __DIR__;
+        $testDirectory = base_path('tests');
         $currentFile = realpath(__FILE__);
         $violations = [];
 
@@ -20,7 +20,7 @@ class BearerTokenHelperUsageTest extends TestCase
         ];
 
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($apiTestDirectory)
+            new RecursiveDirectoryIterator($testDirectory)
         );
 
         foreach ($iterator as $file) {
@@ -31,6 +31,10 @@ class BearerTokenHelperUsageTest extends TestCase
             $path = $file->getRealPath();
 
             if ($path === false || $path === $currentFile) {
+                continue;
+            }
+
+            if (str_contains($path, DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Concerns'.DIRECTORY_SEPARATOR)) {
                 continue;
             }
 
@@ -58,7 +62,7 @@ class BearerTokenHelperUsageTest extends TestCase
         $this->assertSame(
             [],
             $violations,
-            "Feature API tests should use withAccessToken() or withBearerToken() instead of inlining Bearer Authorization headers, including string interpolation forms.\nViolations:\n- ".implode("\n- ", $violations),
+            "Backend tests should use withAccessToken() or withBearerToken() instead of inlining Bearer Authorization headers, including string interpolation forms.\nViolations:\n- ".implode("\n- ", $violations),
         );
     }
 }
