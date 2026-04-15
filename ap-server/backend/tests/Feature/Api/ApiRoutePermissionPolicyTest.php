@@ -28,6 +28,13 @@ class ApiRoutePermissionPolicyTest extends TestCase
         $this->assertRouteRequiresPermissions('api.policies.update', 'required_permissions:object.update');
         $this->assertRouteRequiresPermissions('api.policies.destroy', 'required_permissions:object.delete');
         $this->assertRouteRequiresPermissions('api.checklists.index', 'required_permissions:object.read');
+        $this->assertRouteRequiresPermissions('api.users.index', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.roles.index', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.scopes.index', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.users.show', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.users.assignments.store', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.users.assignments.destroy', 'required_permissions:user.manage');
+        $this->assertRouteRequiresPermissions('api.users.assignments.item.destroy', 'required_permissions:user.manage');
         $this->assertRouteRequiresPermissions('api.checklists.store', 'required_permissions:object.create');
         $this->assertRouteRequiresPermissions('api.checklists.show', 'required_permissions:object.read');
         $this->assertRouteRequiresPermissions('api.checklists.update', 'required_permissions:object.update');

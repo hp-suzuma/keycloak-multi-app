@@ -33,6 +33,7 @@ class AuthorizationSeeder extends Seeder
             'admin' => ['object.read', 'object.update', 'object.create', 'object.delete', 'object.execute'],
             'operator' => ['object.read', 'object.update', 'object.execute'],
             'viewer' => ['object.read'],
+            'user_manager' => ['user.manage'],
         ];
 
         foreach (['server', 'service', 'tenant'] as $scopeLayer) {
@@ -42,7 +43,7 @@ class AuthorizationSeeder extends Seeder
                     [
                         'scope_layer' => $scopeLayer,
                         'permission_role' => $permissionRole,
-                        'name' => str($scopeLayer)->replace('_', ' ')->title().' '.str($permissionRole)->title(),
+                        'name' => str($scopeLayer)->replace('_', ' ')->title().' '.str($permissionRole)->replace('_', ' ')->title(),
                     ],
                 );
 

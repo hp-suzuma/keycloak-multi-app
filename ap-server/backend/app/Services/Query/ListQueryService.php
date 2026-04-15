@@ -35,7 +35,7 @@ class ListQueryService
 
         return $query
             ->orderBy($column, $descending ? 'desc' : 'asc')
-            ->orderBy('id');
+            ->orderBy($query->getModel()->getQualifiedKeyName());
     }
 
     /**

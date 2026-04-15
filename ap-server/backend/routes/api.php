@@ -23,6 +23,13 @@ use App\Http\Controllers\Api\PolicyStoreController;
 use App\Http\Controllers\Api\PolicyShowController;
 use App\Http\Controllers\Api\PolicyUpdateController;
 use App\Http\Controllers\Api\PolicyDeleteController;
+use App\Http\Controllers\Api\UserIndexController;
+use App\Http\Controllers\Api\UserShowController;
+use App\Http\Controllers\Api\UserAssignmentStoreController;
+use App\Http\Controllers\Api\UserAssignmentDeleteController;
+use App\Http\Controllers\Api\UserAssignmentItemDeleteController;
+use App\Http\Controllers\Api\RoleIndexController;
+use App\Http\Controllers\Api\ScopeIndexController;
 use Illuminate\Support\Facades\Route;
 
 // Public and introspection endpoints stay permission-free.
@@ -43,6 +50,27 @@ Route::get('/policies', PolicyIndexController::class)
 Route::get('/checklists', ChecklistIndexController::class)
     ->middleware('required_permissions:object.read')
     ->name('api.checklists.index');
+Route::get('/users', UserIndexController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.users.index');
+Route::get('/roles', RoleIndexController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.roles.index');
+Route::get('/scopes', ScopeIndexController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.scopes.index');
+Route::get('/users/{keycloakSub}', UserShowController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.users.show');
+Route::post('/users/{keycloakSub}/assignments', UserAssignmentStoreController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.users.assignments.store');
+Route::delete('/users/{keycloakSub}/assignments', UserAssignmentDeleteController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.users.assignments.destroy');
+Route::delete('/users/{keycloakSub}/assignments/{assignmentId}', UserAssignmentItemDeleteController::class)
+    ->middleware('required_permissions:user.manage')
+    ->name('api.users.assignments.item.destroy');
 Route::post('/playbooks', PlaybookStoreController::class)
     ->middleware('required_permissions:object.create')
     ->name('api.playbooks.store');

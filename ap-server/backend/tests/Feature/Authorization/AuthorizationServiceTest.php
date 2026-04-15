@@ -60,6 +60,40 @@ class AuthorizationServiceTest extends TestCase
         $this->assertFalse($authorizationService->canAccessScope($currentUser, 'object.read', $otherScope->id));
     }
 
+    public function test_it_returns_only_granted_scope_ids_without_descendants(): void
+    {
+        $serverScope = Scope::query()->create([
+            'layer' => 'server',
+            'code' => 'srv-a',
+            'name' => 'Server A',
+        ]);
+
+        $serviceScope = Scope::query()->create([
+            'layer' => 'service',
+            'code' => 'svc-a',
+            'name' => 'Service A',
+            'parent_scope_id' => $serverScope->id,
+        ]);
+
+        $this->assignRole('keycloak-user-3', 'server_user_manager', $serverScope);
+
+        $authorizationService = app(AuthorizationService::class);
+        $currentUser = new CurrentUser(
+            id: 'keycloak-user-3',
+            name: 'KC User 3',
+            email: 'kc-user-3@example.com',
+        );
+
+        $this->assertSame(
+            [$serverScope->id],
+            $authorizationService->grantedScopeIds($currentUser, ['user.manage']),
+        );
+        $this->assertNotSame(
+            [$serverScope->id, $serviceScope->id],
+            $authorizationService->grantedScopeIds($currentUser, ['user.manage']),
+        );
+    }
+
     public function test_it_returns_an_empty_scope_list_when_the_user_lacks_the_required_permission(): void
     {
         $tenantScope = Scope::query()->create([

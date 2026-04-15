@@ -77,7 +77,7 @@ class AuthorizationService
      * @param  array<int, string>  $requiredPermissions
      * @return array<int, int>
      */
-    public function accessibleScopeIds(?CurrentUser $currentUser, array $requiredPermissions): array
+    public function grantedScopeIds(?CurrentUser $currentUser, array $requiredPermissions): array
     {
         if ($requiredPermissions === []) {
             return [];
@@ -89,7 +89,7 @@ class AuthorizationService
             return [];
         }
 
-        $assignmentScopeIds = collect($authorization['assignments'])
+        return collect($authorization['assignments'])
             ->filter(function (array $assignment) use ($requiredPermissions): bool {
                 $permissionSlugs = collect($assignment['permissions'])
                     ->pluck('slug');
@@ -99,7 +99,18 @@ class AuthorizationService
             })
             ->pluck('scope.id')
             ->unique()
-            ->values();
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     * @return array<int, int>
+     */
+    public function accessibleScopeIds(?CurrentUser $currentUser, array $requiredPermissions): array
+    {
+        $assignmentScopeIds = collect($this->grantedScopeIds($currentUser, $requiredPermissions));
 
         if ($assignmentScopeIds->isEmpty()) {
             return [];

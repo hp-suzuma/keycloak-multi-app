@@ -38,6 +38,7 @@
 - `admin`
 - `operator`
 - `viewer`
+- `user_manager`
 
 ### permissions 一覧案
 
@@ -66,12 +67,15 @@
 - `server_admin`
 - `server_operator`
 - `server_viewer`
+- `server_user_manager`
 - `service_admin`
 - `service_operator`
 - `service_viewer`
+- `service_user_manager`
 - `tenant_admin`
 - `tenant_operator`
 - `tenant_viewer`
+- `tenant_user_manager`
 
 ### permission の割り当て例
 
@@ -87,6 +91,8 @@
   - `object.execute`
 - `viewer`
   - `object.read`
+- `user_manager`
+  - `user.manage`
 
 ## ユーザー管理方針
 
@@ -200,6 +206,188 @@ Keycloak Bearer トークン認証済みの場合の返却例:
   }
 }
 ```
+
+### `GET /api/users`
+
+AP 側ユーザー管理の一覧 endpoint です。route では `required_permissions:user.manage` を必須にし、service では `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` で確定した管理可能 scope 配下に assignment を持つユーザーだけを返します。つまり、システムユーザーは配下 service / tenant を含む管理対象、サービスユーザーは配下 tenant を含む管理対象、テナントユーザーは所属 tenant のユーザー一覧を表示する前提です。`scope_id`, `keycloak_sub`, `keyword`, `sort`, `page`, `per_page` を受け付け、`keyword` は `display_name` / `email` を横断して曖昧検索します。初期 sort は `email` の昇順です。assignment と集約 `permissions` も同じ scope 範囲に限定して返します。
+
+返却例:
+
+```json
+{
+  "data": [
+    {
+      "keycloak_sub": "keycloak-user-1",
+      "display_name": "AP User",
+      "email": "ap-user@example.com",
+      "assignments": [
+        {
+          "id": 1,
+          "scope": {
+            "id": 3,
+            "layer": "tenant",
+            "code": "tenant-a",
+            "name": "Tenant A",
+            "parent_scope_id": 1
+          },
+          "role": {
+            "id": 10,
+            "slug": "tenant_user_manager",
+            "name": "Tenant User Manager",
+            "scope_layer": "tenant",
+            "permission_role": "user_manager"
+          },
+          "permissions": [
+            {
+              "id": 1,
+              "slug": "user.manage",
+              "name": "User Manage"
+            }
+          ]
+        }
+      ],
+      "permissions": [
+        "user.manage"
+      ]
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "per_page": 20,
+    "total": 1,
+    "last_page": 1,
+    "filters": {
+      "scope_id": 3,
+      "keycloak_sub": null,
+      "keyword": "ap",
+      "sort": "keycloak_sub"
+    }
+  }
+}
+```
+
+### `GET /api/roles`
+
+AP 側ユーザー管理 UI 向けの role 一覧 endpoint です。route では `required_permissions:user.manage` を必須にし、role 定義自体は global resource として扱います。`scope_layer`, `permission_role`, `slug`, `name`, `sort` を受け付け、assignment 付与 UI では選択中 scope に合わせて `scope_layer` を指定して候補 role を取得する前提とします。
+
+返却例:
+
+```json
+{
+  "data": [
+    {
+      "id": 11,
+      "slug": "tenant_viewer",
+      "name": "Tenant Viewer",
+      "scope_layer": "tenant",
+      "permission_role": "viewer",
+      "permissions": [
+        {
+          "id": 2,
+          "slug": "object.read",
+          "name": "Object Read"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### `GET /api/scopes`
+
+AP 側ユーザー管理 UI 向けの visible scope 一覧 endpoint です。route では `required_permissions:user.manage` を必須にし、service では `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` で確定した管理可能 scope だけを返します。`layer`, `parent_scope_id`, `code`, `name`, `sort` を受け付け、scope 選択 UI では必要に応じて `layer` や `parent_scope_id` で候補を絞る前提とします。
+
+返却例:
+
+```json
+{
+  "data": [
+    {
+      "id": 3,
+      "layer": "tenant",
+      "code": "tenant-a",
+      "name": "Tenant A",
+      "parent_scope_id": 2
+    }
+  ]
+}
+```
+
+### `GET /api/users/{keycloak_sub}`
+
+AP 側ユーザー管理の詳細取得 endpoint です。route では `required_permissions:user.manage` を必須にし、service では対象ユーザーの assignment を管理可能 scope 配下に絞って読み込みます。visible な assignment が 1 件以上ある場合だけ `200 OK` を返し、対象ユーザーが存在しない場合と、存在しても管理可能 scope に assignment が無い場合はどちらも `404 Not Found` を返します。
+
+返却例:
+
+```json
+{
+  "data": {
+    "keycloak_sub": "keycloak-user-1",
+    "display_name": "AP User",
+    "email": "ap-user@example.com",
+    "assignments": [
+      {
+        "id": 1,
+        "scope": {
+          "id": 3,
+          "layer": "tenant",
+          "code": "tenant-a",
+          "name": "Tenant A",
+          "parent_scope_id": 1
+        },
+        "role": {
+          "id": 11,
+          "slug": "tenant_viewer",
+          "name": "Tenant Viewer",
+          "scope_layer": "tenant",
+          "permission_role": "viewer"
+        },
+        "permissions": [
+          {
+            "id": 2,
+            "slug": "object.read",
+            "name": "Object Read"
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "object.read"
+    ]
+  }
+}
+```
+
+### `POST /api/users/{keycloak_sub}/assignments`
+
+AP 側ユーザーへの role 付与 endpoint です。route では `required_permissions:user.manage` を必須にし、入力された `scope_id` は管理可能 scope 配下であることを要求します。`role_id` は target scope と同じ `scope_layer` を持つ role だけを許可し、同一 `(keycloak_sub, role_id, scope_id)` が既に存在する場合は `422 Unprocessable Entity` を返します。成功時は visible assignment だけを含む user payload を `201 Created` で返します。
+
+リクエスト例:
+
+```json
+{
+  "scope_id": 3,
+  "role_id": 11
+}
+```
+
+### `DELETE /api/users/{keycloak_sub}/assignments`
+
+AP 側ユーザーから role を剥奪する endpoint です。route では `required_permissions:user.manage` を必須にし、payload の `scope_id` と `role_id` で visible assignment を特定して削除します。対象 assignment が存在しない場合と、存在しても管理可能 scope の外にある場合は `404 Not Found` を返します。成功時は `204 No Content` を返します。
+
+### `DELETE /api/users/{keycloak_sub}/assignments/{assignmentId}`
+
+AP 側ユーザーから role を剥奪する個別 endpoint です。route では `required_permissions:user.manage` を必須にし、path の `assignmentId` で visible assignment を特定して削除します。対象 assignment が存在しない場合、別ユーザーの assignment を指した場合、存在しても管理可能 scope の外にある場合はどれも `404 Not Found` を返します。成功時は `204 No Content` を返します。今後の users 系 assignment 個別操作はこちらを基準 route とします。
+
+users 系 assignment の変更は、現段階では `PATCH` を追加せず、この個別削除 endpoint と `POST /api/users/{keycloak_sub}/assignments` の再付与を組み合わせて表現します。
+また、一括更新 endpoint は現段階では追加せず、複数 assignment の調整も single-assignment API の繰り返しで表現します。
+
+## API 契約の運用方針
+
+- 現段階では OpenAPI は未採用とする
+- ただし将来の OpenAPI 移行を前提に、README 上の API 契約は endpoint ごとに request / success response / error case を分けて維持する
+- 設計判断や採用理由は引き続き README の引継ぎメモへ残し、外向き API 契約へ寄る内容は endpoint セクションで明示する
+- response shape、error shape、parameter 命名は新規 API 追加時も既存の表現に寄せ、後から `openapi.yaml` へ写しやすい粒度を保つ
 
 ### `GET /api/objects`
 
@@ -397,6 +585,27 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 - `GET /api/me/authorization`
   - required permissions: なし
   - 理由: 現在ユーザーの AP 側 RBAC 可視化 endpoint で、未認証時も `authorization: null` を返す契約
+- `GET /api/users`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザー管理一覧では route で `user.manage` を明示し、返却対象と assignment 表示範囲を管理可能 scope 配下へ限定するため
+- `GET /api/roles`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザー管理 UI 用の role 一覧でも route で `user.manage` を明示し、assignment 付与候補を同じ権限境界の内側で取得するため
+- `GET /api/scopes`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザー管理 UI 用の scope 一覧でも route で `user.manage` を明示し、visible scope だけを選択候補として返すため
+- `GET /api/users/{keycloak_sub}`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザー管理詳細でも route で `user.manage` を明示し、visible な assignment を持つ対象ユーザーだけを返すため
+- `POST /api/users/{keycloak_sub}/assignments`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザーへの role 付与でも route で `user.manage` を明示し、visible scope の assignment だけを作成対象にするため
+- `DELETE /api/users/{keycloak_sub}/assignments`
+  - required permissions: `user.manage`
+  - 理由: AP 側ユーザーからの role 剥奪でも route で `user.manage` を明示し、visible assignment だけを削除対象にするため
+- `DELETE /api/users/{keycloak_sub}/assignments/{assignmentId}`
+  - required permissions: `user.manage`
+  - 理由: assignment id ベースの個別削除でも route で `user.manage` を明示し、visible assignment を安定して 1 件指定できるようにするため
 - `GET /api/objects`
   - required permissions: `object.read`
   - 理由: 一覧 endpoint でも public / introspection endpoint 以外は route 定義時に required permissions を明示し、返却対象と filter の適用範囲を閲覧可能 scope 配下へ限定するため
@@ -1335,3 +1544,122 @@ php artisan test
 - 決定事項: backend test 整理はこの段階でいったん終了にする。以後は「長い file に明確な読みづらさがある」と再確認できたときだけ個別に再開し、次の開発ステップでは別テーマを優先する
 - 影響範囲: `tests/Feature/Api` の helper 整理シリーズの終了判断、次チャットでの探索優先順位、`ap-server/backend/README.md`
 - 次の推奨アクション: 次は backend test 整理から離れ、backend 実装や API 契約の次タスクを切る前提で、README 上の未着手項目や新しい要求を起点に進める
+
+### AP 側ユーザー管理の最小入口を `GET /api/users` として追加
+
+- 背景: `user.manage` permission は初期設計に入っていたが、実際にそれを使う route と role がまだ無く、AP 側ユーザー管理の API 契約が具体化していなかった
+- 決定事項: `GET /api/users` を追加し、route では `required_permissions:user.manage` を必須にする。返却対象は `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` で確定した管理可能 scope 配下に assignment を持つ AP ユーザーのみに限定し、response の assignment / permissions も同じ scope 範囲に絞る。初期 seed には `server_user_manager` / `service_user_manager` / `tenant_user_manager` を追加し、`admin` へ `user.manage` を暗黙包含させない方針を維持する
+- 影響範囲: `routes/api.php`、`app/Http/Controllers/Api/UserIndexController.php`、`app/Http/Requests/Api/UserIndexRequest.php`、`app/Services/User/*`、`app/Services/Query/ListQueryService.php`、`database/seeders/AuthorizationSeeder.php`、`tests/Feature/Api/UserIndexControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は `GET /api/users/{keycloak_sub}` や assignment 更新 API を検討し、同じ `user.manage` と scope 継承ルールの上で「見える assignment だけ返す」「付与・剥奪できる scope をどう制限するか」を service 契約として固定する
+
+### AP 側ユーザー詳細は visible assignment が無ければ `404` に寄せる
+
+- 背景: `GET /api/users` を追加した段階では、個別ユーザー詳細で「対象ユーザーは存在するが、管理可能 scope に assignment が無い」ケースを `403` にするか `404` にするかがまだ未固定だった。ここを曖昧にすると、次の assignment 更新 API でも存在漏えいの扱いがぶれやすかった
+- 決定事項: `GET /api/users/{keycloak_sub}` を追加し、route では `required_permissions:user.manage` を必須にする。service では対象ユーザーの assignment を visible scope に絞って読み込み、1 件も visible assignment が無い場合は「存在しない」と同じく `404 Not Found` を返す。返却時の assignment / permissions は visible なものだけに限定する
+- 影響範囲: `routes/api.php`、`app/Http/Controllers/Api/UserShowController.php`、`app/Services/User/FindVisibleUser.php`、`app/Services/User/UserShowService.php`、`tests/Feature/Api/UserShowControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は assignment 更新 API を進め、付与・剥奪時にも「visible scope だけを操作対象にできる」「visible でない既存 assignment は存在を前提にしない」という契約で store/update/delete の振る舞いを明文化する
+
+### user assignment の付与・剥奪も visible scope 限定で扱う
+
+- 背景: user 詳細を `404` ベースで隠す方針を決めた後、assignment 付与・剥奪で invisible scope や invisible assignment をどう扱うかが未固定のままだと、管理 API ごとに存在漏えいの境界が変わる懸念があった
+- 決定事項: `POST /api/users/{keycloak_sub}/assignments` と `DELETE /api/users/{keycloak_sub}/assignments` を追加し、どちらも route では `required_permissions:user.manage` を必須にする。付与時は target `scope_id` が visible scope に含まれることを要求し、`role.scope_layer` と `scope.layer` が一致しない組み合わせや重複 assignment は `422` とする。剥奪時は visible assignment のみ削除対象とし、存在しない assignment と invisible assignment は同じく `404 Not Found` に寄せる
+- 影響範囲: `routes/api.php`、`app/Http/Requests/Api/UserAssignmentRequest.php`、`app/Http/Controllers/Api/UserAssignment*Controller.php`、`app/Services/User/*Assignment*`、`tests/Feature/Api/UserAssignment*ControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は assignment の一括更新 API を急いで入れる前に、`role_id` 直指定のままで十分か、`role slug` へ寄せるか、あるいは visible assignment 一覧に識別子を追加するかを README 上の API 契約として先に比較して決める
+
+### OpenAPI は未採用のまま移行容易性を維持する
+
+- 背景: 現プロジェクトはプロトタイプ段階で、現時点では仕様管理の厳密さより試行錯誤の速度を優先したい。一方で、実開発ではこのプロトタイプをベースに進める前提のため、将来 OpenAPI を導入しやすい状態は保っておきたい
+- 決定事項: 現段階では OpenAPI は採用せず、`ap-server/backend/README.md` を API 契約の記録先として継続利用する。ただし endpoint ごとに request / success response / error case を分け、設計判断は引継ぎメモへ分離して、後から `openapi.yaml` へ移しやすい粒度を維持する
+- 影響範囲: `ap-server/backend` の API 記述運用、新規 endpoint 追加時の README 更新粒度、将来の OpenAPI 導入作業の前提
+- 次の推奨アクション: 次に API 契約を広げる場合も、README の endpoint セクションでは shape と status code を先に揃え、OpenAPI 導入そのものは実開発へ移るタイミングでまとめて判断する
+
+### user assignment の識別は `role_id` 直指定を維持しつつ response に `assignment.id` を追加する
+
+- 背景: assignment 更新 API を追加した段階で、次に一括更新や個別更新を考えるなら `role_id` 直指定を続けるか `role slug` へ寄せるか、また visible assignment 一覧に識別子が要るかを先に決めておきたかった。`role slug` へ切り替えると既存 request や validation の修正範囲が広がる一方、今の課題は「見えている assignment を安定して指せること」に寄っていた
+- 決定事項: request は当面 `role_id` + `scope_id` のまま維持し、visible assignment の response に `assignment.id` を追加する。これにより現行 API を崩さず、将来の update/delete/bulk API で「一覧から見えた assignment をそのまま指定する」導線を確保する
+- 影響範囲: `app/Services/User/UserPayload.php`、`tests/Feature/Api/User*Test.php`、`ap-server/backend/README.md` の users 系 payload 契約
+- 次の推奨アクション: 次に users 系 API を進めるなら、assignment 一括更新 API を入れる前に `assignment.id` ベースの個別更新/削除 route に寄せるか、現在の `scope_id + role_id` 指定を維持するかを route 設計として比較し、1 つに固定してから実装へ進む
+
+### users 系 assignment 個別削除は `assignment.id` route を基準にする
+
+- 背景: response に `assignment.id` を追加した後も、削除 API が `scope_id + role_id` payload 前提のままだと、一覧で見えた assignment をそのまま操作する導線が途切れ、将来の個別更新 API 設計も揃えづらかった
+- 決定事項: `DELETE /api/users/{keycloak_sub}/assignments/{assignmentId}` を追加し、users 系 assignment の個別操作はこの `assignment.id` ベース route を今後の基準にする。既存の `DELETE /api/users/{keycloak_sub}/assignments` は互換目的で残すが、新しい個別操作を足す場合は `assignmentId` を優先する
+- 影響範囲: `routes/api.php`、`app/Http/Controllers/Api/UserAssignmentItemDeleteController.php`、`app/Services/User/FindVisibleAssignment.php`、`app/Services/User/UserAssignmentDeleteService.php`、`tests/Feature/Api/UserAssignmentDeleteControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に users 系 API を進めるなら、`PATCH /api/users/{keycloak_sub}/assignments/{assignmentId}` のような assignment 単体更新が本当に必要かを先に見極め、必要なら `assignmentId` ベースで role 変更を許すか、削除 + 再付与に限定するかを API 契約として固定する
+
+### users 系 assignment の変更は当面 `DELETE + POST` に限定する
+
+- 背景: `assignment.id` ベースの個別削除 route を追加した段階で、次に `PATCH /api/users/{keycloak_sub}/assignments/{assignmentId}` を足す選択肢もあったが、visible scope 判定、role と scope layer の整合、存在漏えいの扱いを update API に重ねると契約が一気に複雑になりやすかった
+- 決定事項: 現段階では assignment 単体更新 API は追加せず、変更は `DELETE /api/users/{keycloak_sub}/assignments/{assignmentId}` で既存 assignment を剥奪し、`POST /api/users/{keycloak_sub}/assignments` で新しい role を再付与する手順に限定する。この方針を users 系 assignment の基準運用として README に固定する
+- 影響範囲: `ap-server/backend/README.md` の users 系 API 契約、`tests/Feature/Api/UserAssignmentStoreControllerTest.php` の運用シナリオ、今後の users 系 route 設計判断
+- 次の推奨アクション: 次に users 系 API を進めるなら、assignment 一括更新 API を入れる前に「現状の delete + post 手順で運用上十分か」を確認し、不足が出た時だけ bulk endpoint か patch endpoint のどちらを採るかを改めて比較する
+
+### users 系 assignment の一括更新 endpoint は当面追加しない
+
+- 背景: assignment 単体更新を見送った次の論点として、一括更新 endpoint を先に入れるかどうかがあった。ただ、現状の users 系 API でも visible assignment の追加、個別削除、再付与を組み合わせれば目的状態を構成でき、ここで bulk を先回り導入すると payload 契約や partial failure の扱いが先に複雑化しやすかった
+- 決定事項: 現段階では users 系 assignment の bulk endpoint は追加しない。複数 assignment の変更が必要な場合も、`POST /api/users/{keycloak_sub}/assignments` と `DELETE /api/users/{keycloak_sub}/assignments/{assignmentId}` を繰り返して表現することを基準運用とする
+- 影響範囲: `ap-server/backend/README.md` の users 系 API 契約、`tests/Feature/Api/UserAssignmentStoreControllerTest.php` の sequential workflow、今後の users 系 route 増設判断
+- 次の推奨アクション: 次に users 系 API を進めるなら、bulk が本当に必要になるまで route は増やさず、代わりに role 一覧や scope 選択補助のような UI 支援 API が必要かを見極める
+
+### assignment 付与 UI の最小補助として `GET /api/roles` を追加する
+
+- 背景: bulk や patch を見送った後も、実際に assignment 付与 UI を組むには「選択した scope に対応する role 候補」を安定して取得できる入口が必要だった。role 定義は AP 全体で共有されるため、まずは global resource として一覧取得できれば UI 側の選択肢生成をかなり簡素化できる
+- 決定事項: `GET /api/roles` を追加し、route では `required_permissions:user.manage` を必須にする。`scope_layer`, `permission_role`, `slug`, `name`, `sort` を受け付け、response には role 本体と紐づく permission 一覧を含める。assignment 付与 UI では `scope_layer` filter を使って選択中 scope に対応する候補を絞る前提とする
+- 影響範囲: `routes/api.php`、`app/Http/Requests/Api/RoleIndexRequest.php`、`app/Http/Controllers/Api/RoleIndexController.php`、`app/Services/Role/*`、`tests/Feature/Api/RoleIndexControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に users 系 UI 支援を広げるなら、scope 選択補助が本当に必要かを見極め、必要なら visible scope だけを返す `GET /api/scopes` 系 API を同じ `user.manage` 契約で追加する
+
+### assignment 付与 UI の scope 選択補助として `GET /api/scopes` を追加する
+
+- 背景: role 一覧だけでは assignment 付与 UI の候補生成が完結せず、実際には「今の管理者が選べる scope を可視化する入口」も必要だった。visible scope 判定はすでに `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` に寄っていたため、同じ契約を API としてそのまま出せれば UI 側の独自判定を避けられる
+- 決定事項: `GET /api/scopes` を追加し、route では `required_permissions:user.manage` を必須にする。返却対象は visible scope のみに限定し、`layer`, `parent_scope_id`, `code`, `name`, `sort` で絞り込めるようにする。scope 選択 UI では `layer` や `parent_scope_id` を使って drill-down しながら候補を取得する前提とする
+- 影響範囲: `routes/api.php`、`app/Http/Requests/Api/ScopeIndexRequest.php`、`app/Http/Controllers/Api/ScopeIndexController.php`、`app/Services/Scope/*`、`tests/Feature/Api/ScopeIndexControllerTest.php`、`tests/Feature/Api/ApiRoutePermissionPolicyTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に users 系 UI 支援を広げるなら、role 一覧と scope 一覧が揃った前提で、assignment 付与 UI に追加で必要なのが「現在ユーザーの visible assignment 一覧」なのか「候補 API の pagination / search 強化」なのかを見極める
+
+### 一覧状態復元を見据えても pagination/search は endpoint ごとに温度差を持たせる
+
+- 背景: 一覧画面から詳細画面へ遷移して戻るときに、遷移前の一覧状態を復元したい要件を考えると、API 側でも filter / sort / page の再現性が必要になる。ただし `users`, `roles`, `scopes` は件数の伸び方や UI での使い方が異なり、同じ粒度で pagination/search を先回り導入するとプロトタイプ段階では過剰になりやすかった
+- 決定事項: 一覧状態復元は「URL やフロント state に保持した filter / sort / page を同じ API に再送して再現できること」を前提に考える。そのうえで、`GET /api/users` は管理一覧の主画面候補なので現状の `page`, `per_page`, `sort`, 検索条件を維持し、今後も一覧状態復元の基準 endpoint とする。一方 `GET /api/roles` と `GET /api/scopes` は現段階では候補選択 UI 向けの補助 API と位置づけ、まずは filter / sort のみで運用し、pagination は実際に件数や UX 上の不足が確認できた時点で追加する
+- 影響範囲: `GET /api/users`, `GET /api/roles`, `GET /api/scopes` の今後の拡張判断、一覧画面状態復元の前提、フロントエンド側の URL / state 設計、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に users 系 UI を具体化するなら、まずはフロント側でどの一覧画面に「戻った時の状態復元」が必要かを洗い出し、その対象が `roles` / `scopes` にも及ぶと分かった時だけ `page`, `per_page`, `meta` を追加する
+
+### `GET /api/users` は一覧状態復元の基準 endpoint として現状維持する
+
+- 背景: `users` 一覧は詳細画面への遷移元になりやすく、一覧状態復元の要求がもっとも自然に出る endpoint だった。すでに `scope_id`, `keycloak_sub`, `display_name`, `email`, `sort`, `page`, `per_page`, `meta` を備えているため、ここを不用意に削るより基準として扱う方が後続の画面設計と相性が良かった
+- 決定事項: `GET /api/users` は現在の pagination/search 契約を維持し、一覧状態復元を支える基準 endpoint とする。フロント側で URL や state に保持する query 条件も、この endpoint の request 契約をそのまま使う前提でよい
+- 影響範囲: `GET /api/users` の request / response 契約、users 一覧画面の URL 設計、将来の OpenAPI 化での query parameter 表現
+- 次の推奨アクション: users 一覧 UI を作る段階では、`scope_id`, `keycloak_sub`, `display_name`, `email`, `sort`, `page`, `per_page` を URL へ保持するかをフロント側で先に決める
+
+### `GET /api/roles` と `GET /api/scopes` は当面 filter/sort のみで十分とする
+
+- 背景: `roles` は seed ベースの固定的な候補一覧、`scopes` も現段階では assignment 付与 UI の drill-down 補助という位置づけで、`users` 一覧ほど「詳細へ遷移して戻る時に同じ page を再現したい」要求が強くなかった。現時点で pagination を先回り追加すると、`meta` 契約や page 管理だけが先に増えて運用コストが上がりやすかった
+- 決定事項: `GET /api/roles` と `GET /api/scopes` は当面 `filter + sort` のみをサポートし、pagination / `meta` は未導入のままとする。状態復元が必要になった場合も、まずは `scope_layer`, `permission_role`, `slug`, `name`, `layer`, `parent_scope_id`, `code`, `sort` のような filter/sort 条件だけを URL に保持する前提で運用する
+- 影響範囲: `GET /api/roles`, `GET /api/scopes` の current contract、候補選択 UI の実装方針、今後の pagination 追加判断
+- 次の推奨アクション: `roles` / `scopes` の候補件数が実際に多くなったか、または一覧状態復元で page 単位の再現が必要になった時点で、`users` と同じ `meta.current_page`, `meta.per_page`, `meta.total`, `meta.last_page` を追加するかを再評価する
+
+### フロント雛形段階では users 系候補 API の追加拡張を止めてよい
+
+- 背景: 一覧状態復元の前提を整理したうえで `ap-server/frontend` を確認すると、現時点では `app/pages/index.vue` の雛形だけがあり、`users`, `roles`, `scopes` の一覧画面や詳細画面、一覧から詳細へ遷移して戻る具体フローはまだ実装されていなかった。この段階で backend 側の候補 API に pagination/search や追加 resource を先回りで増やすと、実際の画面要件が固まる前に契約だけが広がりやすい
+- 決定事項: 現時点では `GET /api/users` を一覧状態復元の基準 endpoint として維持しつつ、`GET /api/roles` と `GET /api/scopes` の契約は当面このまま据え置く。users 系 UI 支援 API の次拡張は、フロント側で実際の一覧画面や詳細遷移フローが具体化してから再開する
+- 影響範囲: `ap-server/backend` の API 拡張優先順位、`ap-server/frontend` の画面設計前提、README を正とするプロトタイプ段階の契約管理
+- 次の推奨アクション: 次は `ap-server/frontend` 側で users 一覧と詳細の最小画面フローを定義し、「戻る時に復元したい query 条件」と「roles/scopes 候補で本当に必要な search 条件」を画面単位で洗い出してから、必要な backend 契約だけを追加する
+
+### users 一覧は状態復元を前提にせず、曖昧検索だけを活かす
+
+- 背景: フロント側の users 一覧要件として、「詳細から戻った時に遷移前の一覧状態を復元する必要はない」「検索条件は必須ではないが、名前 / メールアドレスでの曖昧検索は欲しい」という方針が固まった。これにより、users 一覧を一覧状態復元の代表例として強く扱う必要は薄れ、むしろ現在の検索条件が UI 要件をすでに満たしているかが焦点になった
+- 決定事項: `GET /api/users` は `keyword` filter を採用し、`display_name` / `email` を横断する曖昧検索を users 一覧 UI の最小契約とする。一方で、users 一覧について「戻る時の query / page 復元」を前提にした追加 backend 対応は当面行わない
+- 影響範囲: `GET /api/users` の今後の拡張判断、users 一覧 UI の検索仕様、一覧状態復元を前提とした backend 優先度
+- 次の推奨アクション: 次に進めるなら、frontend 側で users 一覧の検索 UI を `keyword` 1 入力前提で具体化し、`keycloak_sub` を UI に出すかどうかと、一覧の sort をどこまで露出するかを画面単位で決める
+
+### users 一覧は管理可能な配下 scope を含めて無条件表示し、初期 sort はメール昇順にする
+
+- 背景: users 一覧 UI の要件として、「上位ユーザーは配下のユーザー管理が可能で、初期の管理者登録や代行メンテナンスにも使う」「初回表示は条件なし」「sort は名称 / メールアドレスで、初期はメールアドレス昇順」という前提が固まった。`所属 scope そのものだけ` に絞ると、システムユーザーが service や tenant のユーザー一覧へ遷移した時に必要な参照と管理ができなかった
+- 決定事項: `GET /api/users` の一覧対象は `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` ベースとし、`user.manage` を持つ scope とその配下 scope の assignment を一覧対象に含める。初回表示は query なしで取得し、default sort は `email` 昇順とする。`keyword` はオプションの横断曖昧検索として維持する
+- 影響範囲: `app/Services/User/UserIndexService.php`、`tests/Feature/Api/UserIndexControllerTest.php`、users 一覧 UI の表示前提、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進めるなら、frontend 側で users 一覧の column と sort UI を固めつつ、`scope_id` を使った service / tenant 切り替え導線をどう置くかを画面側で決める
+
+### users 管理 UI は drill-down 操作を基本にし、配下一覧は `scope_id` で絞る
+
+- 背景: 画面イメージとして、上位ユーザーが下位レイヤーの対象を操作する時は、server -> service -> tenant のように対象レイヤーまで drill-down してから操作する前提が固まった。一方で、上位ユーザーは配下の対象一覧自体は参照できる必要があり、service ユーザーが配下 tenant ユーザーを一覧表示して tenant 条件で絞るような使い方も想定されている
+- 決定事項: users 管理 UI の基本動線は drill-down とし、実際の一覧表示や操作対象の確定は選択済み scope を `scope_id` として `GET /api/users` に渡して行う。上位ユーザーは配下 scope を参照できるが、作成やメンテナンスの実操作は対象 scope を明示的に選んだ状態で進める前提とする
+- 影響範囲: `GET /api/users` の `scope_id` filter の位置づけ、frontend 側の service / tenant 選択導線、users 一覧画面の drill-down UX、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進めるなら、frontend 側の画面遷移を前提に `GET /api/scopes` の `parent_scope_id` を使った drill-down 候補取得フローを具体化し、service 一覧から tenant 一覧へどう繋ぐかを決める
