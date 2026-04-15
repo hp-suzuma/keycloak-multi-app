@@ -1328,3 +1328,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PolicyIndexControllerTest.php` に `policyPayload()` と `metaPayload()`、`tests/Feature/Api/ChecklistIndexControllerTest.php` に `checklistPayload()` と `metaPayload()` を追加し、success response の固定 shape を file 内 helper に寄せた。invalid filter validation は shared base ですでに共通化済みなので、そのまま維持した
 - 影響範囲: `tests/Feature/Api/PolicyIndexControllerTest.php`、`tests/Feature/Api/ChecklistIndexControllerTest.php`、index 系 success response assertion の helper 粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、index 系の helper 粒度が揃った前提で、残る長めの file に本文を重くする固定 shape があるかを個別に見直す
+
+### backend test 整理はいったんここで終了にする
+
+- 背景: ここまでで resource 横断の success response shape、object 系の一部 validation shape、index 系の payload / meta helper 粒度まで揃い、本文で読みたい差分と固定 shape のバランスがかなり安定した。残る候補は file ごとの細かい最適化が中心で、これ以上は重複削減より helper 増加や判断コストの方が目立ちやすかった
+- 決定事項: backend test 整理はこの段階でいったん終了にする。以後は「長い file に明確な読みづらさがある」と再確認できたときだけ個別に再開し、次の開発ステップでは別テーマを優先する
+- 影響範囲: `tests/Feature/Api` の helper 整理シリーズの終了判断、次チャットでの探索優先順位、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は backend test 整理から離れ、backend 実装や API 契約の次タスクを切る前提で、README 上の未着手項目や新しい要求を起点に進める
