@@ -20,8 +20,7 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
             'parent_scope_id' => $serverScope->id,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-store'))
+        $response = $this->withAccessToken('keycloak-user-playbook-store')
             ->postJson('/api/playbooks', [
                 'scope_id' => $tenantScope->id,
                 'code' => ' Tenant_Playbook ',
@@ -50,8 +49,7 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Existing Playbook',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-store-dup'))
+        $response = $this->withAccessToken('keycloak-user-playbook-store-dup')
             ->postJson('/api/playbooks', [
                 'scope_id' => $scope->id,
                 'code' => ' Tenant_Playbook ',

@@ -19,8 +19,7 @@ class ChecklistShowControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Tenant Checklist',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-show'))
+        $response = $this->withAccessToken('keycloak-user-checklist-show')
             ->getJson('/api/checklists/'.$checklist->id);
 
         $response

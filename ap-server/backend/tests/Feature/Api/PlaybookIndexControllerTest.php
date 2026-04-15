@@ -57,8 +57,7 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
             'name' => 'Forbidden Runbook',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbooks'))
+        $response = $this->withAccessToken('keycloak-user-playbooks')
             ->getJson('/api/playbooks');
 
         $response
@@ -122,8 +121,7 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
             'name' => 'Ignored Name',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbooks-filter'))
+        $response = $this->withAccessToken('keycloak-user-playbooks-filter')
             ->getJson('/api/playbooks?scope_id='.$tenantScope->id.'&name=Target&sort=code');
 
         $response

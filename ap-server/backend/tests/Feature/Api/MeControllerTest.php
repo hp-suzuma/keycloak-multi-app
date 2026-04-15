@@ -54,8 +54,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -100,8 +99,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -125,8 +123,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -153,8 +150,7 @@ class MeControllerTest extends KeycloakApiTestCase
             $this->base64UrlEncode('signature'),
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -176,8 +172,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -211,8 +206,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response
@@ -248,8 +242,7 @@ class MeControllerTest extends KeycloakApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
         $response

@@ -20,8 +20,7 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Playbook A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-update'))
+        $response = $this->withAccessToken('keycloak-user-playbook-update')
             ->patchJson('/api/playbooks/'.$playbook->id, [
                 'code' => ' Updated_Playbook ',
                 'name' => 'Updated Playbook',
@@ -61,8 +60,7 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Playbook A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-move'))
+        $response = $this->withAccessToken('keycloak-user-playbook-move')
             ->patchJson('/api/playbooks/'.$playbook->id, [
                 'scope_id' => $targetScope->id,
                 'name' => 'Moved Playbook',

@@ -14,8 +14,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
     {
         $scope = $this->assignRole('keycloak-user-1', 'tenant_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-1'))
+        $response = $this->withAccessToken('keycloak-user-1')
             ->postJson('/api/objects', [
                 'scope_id' => $scope->id,
                 'code' => '',
@@ -43,8 +42,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
 
         $this->assignRole('keycloak-user-2', 'tenant_admin', $accessibleScope);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-2'))
+        $response = $this->withAccessToken('keycloak-user-2')
             ->postJson('/api/objects', [
                 'scope_id' => $forbiddenScope->id,
                 'code' => 'object-b',
@@ -71,8 +69,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
             'parent_scope_id' => $serverScope->id,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-3'))
+        $response = $this->withAccessToken('keycloak-user-3')
             ->postJson('/api/objects', [
                 'scope_id' => $tenantScope->id,
                 'code' => ' Object_C ',
@@ -107,8 +104,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Existing Object',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-duplicate'))
+        $response = $this->withAccessToken('keycloak-user-duplicate')
             ->postJson('/api/objects', [
                 'scope_id' => $scope->id,
                 'code' => '  Duplicated_Code  ',

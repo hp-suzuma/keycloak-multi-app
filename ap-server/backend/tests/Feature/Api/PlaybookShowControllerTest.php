@@ -50,8 +50,7 @@ class PlaybookShowControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Tenant Playbook',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-show'))
+        $response = $this->withAccessToken('keycloak-user-playbook-show')
             ->getJson('/api/playbooks/'.$playbook->id);
 
         $response

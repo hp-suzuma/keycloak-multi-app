@@ -20,8 +20,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-1'))
+        $response = $this->withAccessToken('keycloak-user-1')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'name' => '',
             ]);
@@ -41,8 +40,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object Empty',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-empty'))
+        $response = $this->withAccessToken('keycloak-user-empty')
             ->patchJson('/api/objects/'.$managedObject->id, []);
 
         $response
@@ -59,8 +57,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
     {
         $this->assignRole('keycloak-user-2', 'tenant_operator');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-2'))
+        $response = $this->withAccessToken('keycloak-user-2')
             ->patchJson('/api/objects/999999', [
                 'name' => 'Updated Name',
             ]);
@@ -94,8 +91,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object B',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-3'))
+        $response = $this->withAccessToken('keycloak-user-3')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'name' => 'Updated Object B',
             ]);
@@ -126,8 +122,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object C',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-4'))
+        $response = $this->withAccessToken('keycloak-user-4')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'code' => ' Updated_Object_C ',
                 'name' => 'Updated Object C',
@@ -171,8 +166,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object Move',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-move'))
+        $response = $this->withAccessToken('keycloak-user-move')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'scope_id' => $targetScope->id,
                 'name' => 'Moved Object',
@@ -219,8 +213,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Object Move Fail',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-move-fail'))
+        $response = $this->withAccessToken('keycloak-user-move-fail')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'scope_id' => $targetScope->id,
             ]);
@@ -250,8 +243,7 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Editable Object',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-dup-update'))
+        $response = $this->withAccessToken('keycloak-user-dup-update')
             ->patchJson('/api/objects/'.$managedObject->id, [
                 'code' => ' Duplicated_Code ',
             ]);

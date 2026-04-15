@@ -70,8 +70,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me/authorization');
 
         $response
@@ -150,8 +149,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
             'exp' => now()->addMinutes(5)->timestamp,
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$token)
+        $response = $this->withBearerToken($token)
             ->getJson('/api/me/authorization');
 
         $response

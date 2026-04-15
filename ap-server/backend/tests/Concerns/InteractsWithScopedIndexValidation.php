@@ -8,8 +8,7 @@ trait InteractsWithScopedIndexValidation
     {
         $this->assignRole($keycloakSub, 'server_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken($keycloakSub))
+        $response = $this->withAccessToken($keycloakSub)
             ->getJson($uri.'?scope_id=invalid&sort=scope_id&page=0&per_page=101');
 
         $response

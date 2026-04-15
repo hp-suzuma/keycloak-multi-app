@@ -20,8 +20,7 @@ class ChecklistUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Checklist A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-update'))
+        $response = $this->withAccessToken('keycloak-user-checklist-update')
             ->patchJson('/api/checklists/'.$checklist->id, [
                 'code' => ' Updated_Checklist ',
                 'name' => 'Updated Checklist',
@@ -61,8 +60,7 @@ class ChecklistUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Checklist A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-move'))
+        $response = $this->withAccessToken('keycloak-user-checklist-move')
             ->patchJson('/api/checklists/'.$checklist->id, [
                 'scope_id' => $targetScope->id,
                 'name' => 'Moved Checklist',

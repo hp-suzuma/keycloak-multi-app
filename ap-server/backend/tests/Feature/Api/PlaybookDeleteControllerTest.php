@@ -19,8 +19,7 @@ class PlaybookDeleteControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Playbook A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-playbook-delete'))
+        $response = $this->withAccessToken('keycloak-user-playbook-delete')
             ->deleteJson('/api/playbooks/'.$playbook->id);
 
         $response->assertNoContent();

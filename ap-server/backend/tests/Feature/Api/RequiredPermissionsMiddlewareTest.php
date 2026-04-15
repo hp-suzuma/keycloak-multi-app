@@ -2,11 +2,10 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\Scope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 
-class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
+class RequiredPermissionsMiddlewareTest extends CreateAuthorizationApiTestCase
 {
     use RefreshDatabase;
 
@@ -37,8 +36,7 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
     {
         $this->assignRole('keycloak-user-1', 'tenant_viewer');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-1'))
+        $response = $this->withAccessToken('keycloak-user-1')
             ->getJson('/api/test/permissions/read');
 
         $response
@@ -52,8 +50,7 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
     {
         $this->assignRole('keycloak-user-2', 'tenant_viewer');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-2'))
+        $response = $this->withAccessToken('keycloak-user-2')
             ->getJson('/api/test/permissions/read-execute');
 
         $response
@@ -68,8 +65,7 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
     {
         $this->assignRole('keycloak-user-3', 'server_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-3'))
+        $response = $this->withAccessToken('keycloak-user-3')
             ->getJson('/api/test/permissions/read-execute');
 
         $response
@@ -77,16 +73,5 @@ class RequiredPermissionsMiddlewareTest extends AuthorizationApiTestCase
             ->assertExactJson([
                 'status' => 'ok',
             ]);
-    }
-
-    private function assignRole(string $keycloakSub, string $roleSlug): void
-    {
-        $this->createAuthorizationUser($keycloakSub);
-        $scope = Scope::query()->create([
-            'layer' => str($roleSlug)->before('_')->value(),
-            'code' => $roleSlug.'-scope',
-            'name' => $roleSlug.' scope',
-        ]);
-        $this->createUserRoleAssignment($keycloakSub, $roleSlug, $scope);
     }
 }

@@ -14,8 +14,7 @@ class ObjectDeleteControllerTest extends CreateAuthorizationApiTestCase
     {
         $this->assignRole('keycloak-user-1', 'tenant_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-1'))
+        $response = $this->withAccessToken('keycloak-user-1')
             ->deleteJson('/api/objects/999999');
 
         $response
@@ -47,8 +46,7 @@ class ObjectDeleteControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Object B',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-2'))
+        $response = $this->withAccessToken('keycloak-user-2')
             ->deleteJson('/api/objects/'.$managedObject->id);
 
         $response
@@ -77,8 +75,7 @@ class ObjectDeleteControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Object C',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-3'))
+        $response = $this->withAccessToken('keycloak-user-3')
             ->deleteJson('/api/objects/'.$managedObject->id);
 
         $response->assertNoContent();

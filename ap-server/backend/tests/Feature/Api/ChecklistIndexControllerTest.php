@@ -32,8 +32,7 @@ class ChecklistIndexControllerTest extends ScopedIndexValidationApiTestCase
             'name' => 'Tenant Checklist',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklists'))
+        $response = $this->withAccessToken('keycloak-user-checklists')
             ->getJson('/api/checklists');
 
         $response

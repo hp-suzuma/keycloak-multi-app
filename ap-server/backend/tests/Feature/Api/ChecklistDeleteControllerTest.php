@@ -19,8 +19,7 @@ class ChecklistDeleteControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Checklist A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-delete'))
+        $response = $this->withAccessToken('keycloak-user-checklist-delete')
             ->deleteJson('/api/checklists/'.$checklist->id);
 
         $response->assertNoContent();

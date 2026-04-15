@@ -32,8 +32,7 @@ class PolicyIndexControllerTest extends ScopedIndexValidationApiTestCase
             'name' => 'Tenant Policy',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policies'))
+        $response = $this->withAccessToken('keycloak-user-policies')
             ->getJson('/api/policies');
 
         $response

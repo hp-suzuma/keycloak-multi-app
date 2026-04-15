@@ -13,8 +13,7 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
     {
         $scope = $this->assignRole('keycloak-user-policy-store', 'tenant_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-store'))
+        $response = $this->withAccessToken('keycloak-user-policy-store')
             ->postJson('/api/policies', [
                 'scope_id' => $scope->id,
                 'code' => ' Tenant_Policy ',
@@ -48,8 +47,7 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Existing Policy',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-store-dup'))
+        $response = $this->withAccessToken('keycloak-user-policy-store-dup')
             ->postJson('/api/policies', [
                 'scope_id' => $scope->id,
                 'code' => ' Tenant_Policy ',

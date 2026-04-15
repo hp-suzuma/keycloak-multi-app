@@ -817,3 +817,178 @@ php artisan test
 - 決定事項: import block の昇順ゆれと末尾スペースを確認した結果、追加で直すべき file は見つからなかったため、このテーマではコード変更を行わない。意味差を生まない整形差分は、機械的に不一致が確認できたものだけを対象にする方針を継続する
 - 影響範囲: `tests/Feature/Api` 配下の整形判断、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 側のノイズを減らすなら、整形テーマの探索はいったん区切り、`tests/Feature/Api` とその基底 test case で責務の薄い重複 helper や fixture 構築がないかを「挙動を変えない小さな共通化候補」として確認する
+
+### API feature test の小さな共通化候補は bearer 付与と role 割り当て helper に絞る
+
+- 背景: 前回の引継ぎどおり、`tests/Feature/Api` と基底 test case を対象に「挙動を変えない小さな共通化候補」を点検したところ、一覧・CRUD・middleware test をまたいで同じ Bearer token 付与と認可 user 準備が何度も繰り返されていた。一方で response の厳密 assertion や resource ごとの fixture 構築は、共通化すると test の読みやすさを落としやすかった
+- 決定事項: 現時点で次の候補だけを「小さくて安全な共通化対象」として扱う。1) `KeycloakApiTestCase` か `InteractsWithKeycloakTokens` に、`withHeader('Authorization', 'Bearer '.$this->buildAccessToken(...))` を置き換える薄い helper を追加する候補。これは `ObjectStoreControllerTest`、`ObjectUpdateControllerTest`、`PlaybookIndexControllerTest`、`RequiredPermissionsMiddlewareTest` など `tests/Feature/Api` 全体で繰り返されている。2) `RequiredPermissionsMiddlewareTest` の private `assignRole()` は、既存の `CreateAuthorizationApiTestCase::assignRole()` と責務が近いため、既存 helper を使う方向で寄せる候補。逆に、`CreateAuthorizationApiTestCase` と `UpsertAuthorizationApiTestCase` の統合や、index / CRUD test の JSON assertion 共通化は、create と upsert の意味差や test 可読性を崩す可能性があるため今回の小さな共通化対象には含めない
+- 影響範囲: `tests/Feature/Api/KeycloakApiTestCase.php`、`tests/Concerns/InteractsWithKeycloakTokens.php`、`tests/Feature/Api/CreateAuthorizationApiTestCase.php`、`tests/Feature/Api/RequiredPermissionsMiddlewareTest.php`、`tests/Feature/Api` 配下の Bearer token 利用 test
+- 次の推奨アクション: 実装に進む場合は、まず Bearer token 付与 helper を 1 つ追加し、影響範囲が狭い `RequiredPermissionsMiddlewareTest` から既存 helper への寄せ替えを行う。その後、`tests/Feature/Api` の 1 系統だけで新 helper へ置換し、対象 feature test 実行で挙動差がないことを確認してから横展開する
+
+### API feature test の最初の共通化実装は middleware test だけで閉じる
+
+- 背景: 小さな共通化候補の確認後、いきなり `tests/Feature/Api` 全体を置換すると差分が広がりやすいため、まずは影響範囲が読みやすい `RequiredPermissionsMiddlewareTest` だけで helper 導入の安全性を確かめる必要があった
+- 決定事項: `tests/Concerns/InteractsWithKeycloakTokens.php` に `withAccessToken()` を追加し、Bearer header 構築を 1 箇所へ寄せた。利用側の最初の適用先は `tests/Feature/Api/RequiredPermissionsMiddlewareTest.php` のみに限定し、この test は `CreateAuthorizationApiTestCase` を継承して既存 `assignRole()` を使う形へ寄せ替え、file 内 private helper は削除した
+- 影響範囲: `tests/Concerns/InteractsWithKeycloakTokens.php`、`tests/Feature/Api/RequiredPermissionsMiddlewareTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に横展開する場合は、`InteractsWithScopedIndexValidation` を使う index 系か、単独 file で閉じやすい middleware / show 系のどちらか 1 系統だけを選び、`withAccessToken()` への置換と対象 feature test 実行をセットで進める
+
+### API feature test の access token helper 横展開は index 系を 1 file と concern に限定する
+
+- 背景: `withAccessToken()` の最初の導入後、次の横展開先として index 系を選ぶ場合でも、`ObjectIndexControllerTest` まで一気に広げると変更量が急に増えるため、まずは shared concern と単独 file の組み合わせで安全性を確かめる段階が必要だった
+- 決定事項: 今回は `tests/Concerns/InteractsWithScopedIndexValidation.php` と `tests/Feature/Api/PlaybookIndexControllerTest.php` だけを `withAccessToken()` へ置換した。`PolicyIndexControllerTest`、`ChecklistIndexControllerTest`、`ObjectIndexControllerTest` はまだ未変更のまま残し、index 系でも 1 concern + 1 file 以上には広げない
+- 影響範囲: `tests/Concerns/InteractsWithScopedIndexValidation.php`、`tests/Feature/Api/PlaybookIndexControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同じ helper の横展開を続ける場合は、今回と同じ index 系の残り 1 file ずつへ進めるか、show 系 1 file に切り替えるかのどちらかに限定し、毎回 README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は index 系でも 1 file ずつ継続する
+
+- 背景: index 系の最初の横展開で `InteractsWithScopedIndexValidation` と `PlaybookIndexControllerTest` が通った後も、`ChecklistIndexControllerTest` には同型の Bearer header 構築が残っていた。ただし、ここで `PolicyIndexControllerTest` や `ObjectIndexControllerTest` までまとめて触ると再び差分が広がるため、README に残している 1 file 単位を維持する必要があった
+- 決定事項: 今回は `tests/Feature/Api/ChecklistIndexControllerTest.php` だけを `withAccessToken()` へ置換した。shared concern 側は前回の変更をそのまま利用し、今回新たに他の index / show / CRUD test へは広げていない
+- 影響範囲: `tests/Feature/Api/ChecklistIndexControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に続ける場合は、index 系なら `PolicyIndexControllerTest` か `ObjectIndexControllerTest` のどちらか 1 file だけ、別系統へ切り替えるなら show 系 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで進める
+
+### API feature test の access token helper 横展開は index 系の残 file も 1 件ずつ閉じる
+
+- 背景: `ChecklistIndexControllerTest` の整理後も、index 系では `PolicyIndexControllerTest` と `ObjectIndexControllerTest` に同型の `withHeader('Authorization', 'Bearer '.$this->buildAccessToken(...))` が残っていた。ここで 2 file 同時に進めると、README で維持している「1 file ごとの安全確認」の粒度が崩れるため、残件も個別に閉じる必要があった
+- 決定事項: 今回は `tests/Feature/Api/PolicyIndexControllerTest.php` だけを `withAccessToken()` へ置換した。`ObjectIndexControllerTest` は未変更のまま残し、index 系の横展開もまだシリーズで一括変更しない
+- 影響範囲: `tests/Feature/Api/PolicyIndexControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、index 系を続けるなら `ObjectIndexControllerTest` だけ、別系統に切り替えるなら show 系 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は object index を最後に index 系を一段落する
+
+- 背景: index 系の 1 file ずつの横展開を続けた結果、最後に残っていた Bearer header 直書きは `ObjectIndexControllerTest` だけになっていた。ここを閉じれば index 系は `withAccessToken()` へ一通り寄せられるため、次のテーマを show 系など別の 1 file 単位へ切り替えやすくなる
+- 決定事項: 今回は `tests/Feature/Api/ObjectIndexControllerTest.php` の access token 付与 6 箇所だけを `withAccessToken()` へ置換した。shared concern や assertion には追加変更を入れず、index 系の helper 横展開はこの file をもって一段落とする
+- 影響範囲: `tests/Feature/Api/ObjectIndexControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同じ方針で進める場合は、show 系の `PlaybookShowControllerTest` か `ChecklistShowControllerTest` のどちらか 1 file だけを選び、`withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は show 系も 1 file から再開する
+
+- 背景: index 系の横展開が一段落したため、次は別系統へ切り替える必要があった。show 系でも同型の Bearer header 構築が残っているが、最初から複数 resource をまとめると index 系で維持してきた「1 file ごとの安全確認」が崩れやすい
+- 決定事項: 今回は show 系の入口として `tests/Feature/Api/PlaybookShowControllerTest.php` だけを `withAccessToken()` へ置換した。`ChecklistShowControllerTest` や他の show / CRUD test にはまだ触れず、show 系でも 1 file 単位を継続する
+- 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、show 系を続けるなら `ChecklistShowControllerTest` だけ、別系統へ切り替えるなら store 系 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は show 系も残 file を 1 件ずつ閉じる
+
+- 背景: `PlaybookShowControllerTest` の整理後も、show 系では `ChecklistShowControllerTest` に同型の Bearer header 構築が残っていた。ここで別系統へ移る前に、show 系の残件も 1 file 単位で閉じておく方が次の判断を単純にできる
+- 決定事項: 今回は `tests/Feature/Api/ChecklistShowControllerTest.php` だけを `withAccessToken()` へ置換した。show 系でも他 file への横展開はまだ行わず、1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/ChecklistShowControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、store 系の `ChecklistStoreControllerTest` か `PlaybookStoreControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は store 系も 1 file から切り替える
+
+- 背景: show 系の残件を閉じたあと、次の横展開先として store 系にも同型の Bearer header 構築が残っていた。ただし、show 系と同様に複数 resource を同時に触ると差分が広がるため、store 系でもまず 1 file だけで安全性を確認する必要があった
+- 決定事項: 今回は store 系の入口として `tests/Feature/Api/ChecklistStoreControllerTest.php` だけを `withAccessToken()` へ置換した。`PlaybookStoreControllerTest` や他の store / update / delete test にはまだ触れていない
+- 影響範囲: `tests/Feature/Api/ChecklistStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、store 系を続けるなら `PlaybookStoreControllerTest` だけ、別系統へ切り替えるなら update 系 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は store 系の残 file も 1 件ずつ閉じる
+
+- 背景: `ChecklistStoreControllerTest` の整理後も、store 系では `PlaybookStoreControllerTest` に同型の Bearer header 構築が残っていた。ここで update 系へ移る前に、store 系の残件を 1 file 単位で閉じておくと次の系統切り替えを整理しやすい
+- 決定事項: 今回は `tests/Feature/Api/PlaybookStoreControllerTest.php` だけを `withAccessToken()` へ置換した。store 系でも他 file への横展開はまだ行わず、1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/PlaybookStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、update 系の `ChecklistUpdateControllerTest` か `PlaybookUpdateControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は update 系も 1 file から切り替える
+
+- 背景: store 系の残件を閉じたあと、次の横展開先として update 系にも同型の Bearer header 構築が残っていた。update 系は移動パターンを含んでいるため、なおさら複数 file をまとめず、まず 1 file だけで安全性を確認する必要があった
+- 決定事項: 今回は update 系の入口として `tests/Feature/Api/ChecklistUpdateControllerTest.php` だけを `withAccessToken()` へ置換した。`PlaybookUpdateControllerTest` や他の update / delete test にはまだ触れていない
+- 影響範囲: `tests/Feature/Api/ChecklistUpdateControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、update 系を続けるなら `PlaybookUpdateControllerTest` だけ、別系統へ切り替えるなら delete 系 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は update 系の残 file も 1 件ずつ閉じる
+
+- 背景: `ChecklistUpdateControllerTest` の整理後も、update 系では `PlaybookUpdateControllerTest` に同型の Bearer header 構築が残っていた。ここで delete 系へ移る前に、update 系の残件も 1 file 単位で閉じておく方が次の系統切り替えを整理しやすい
+- 決定事項: 今回は `tests/Feature/Api/PlaybookUpdateControllerTest.php` だけを `withAccessToken()` へ置換した。update 系でも他 file への横展開はまだ行わず、1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/PlaybookUpdateControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、delete 系の `ChecklistDeleteControllerTest` か `PlaybookDeleteControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は delete 系も 1 file から切り替える
+
+- 背景: update 系の残件を閉じたあと、次の横展開先として delete 系にも同型の Bearer header 構築が残っていた。delete 系は file ごとの差分が小さいため、ここでも複数 resource をまとめず 1 file 単位で進める方が引継ぎしやすい
+- 決定事項: 今回は delete 系の入口として `tests/Feature/Api/ChecklistDeleteControllerTest.php` だけを `withAccessToken()` へ置換した。`PlaybookDeleteControllerTest` や他の delete / object 系 test にはまだ触れていない
+- 影響範囲: `tests/Feature/Api/ChecklistDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、delete 系を続けるなら `PlaybookDeleteControllerTest` だけ、別系統へ切り替えるなら object 系 CRUD 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は delete 系の残 file も 1 件ずつ閉じる
+
+- 背景: `ChecklistDeleteControllerTest` の整理後も、delete 系では `PlaybookDeleteControllerTest` に同型の Bearer header 構築が残っていた。ここで object 系へ移る前に、delete 系の残件も 1 file 単位で閉じておく方が次の系統切り替えを整理しやすい
+- 決定事項: 今回は `tests/Feature/Api/PlaybookDeleteControllerTest.php` だけを `withAccessToken()` へ置換した。delete 系でも他 file への横展開はまだ行わず、1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/PlaybookDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、object 系 CRUD の `ObjectShowControllerTest` か `ObjectStoreControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は object 系も 1 file から切り替える
+
+- 背景: delete 系の残件を閉じたあと、次の横展開先として object 系 CRUD にも同型の Bearer header 構築が残っていた。object 系は not found / forbidden / success の分岐が多いため、ここでも複数 file をまとめず 1 file だけで安全性を確認する必要があった
+- 決定事項: 今回は object 系の入口として `tests/Feature/Api/ObjectShowControllerTest.php` だけを `withAccessToken()` へ置換した。`ObjectStoreControllerTest`、`ObjectUpdateControllerTest`、`ObjectDeleteControllerTest` にはまだ触れていない
+- 影響範囲: `tests/Feature/Api/ObjectShowControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、object 系を続けるなら `ObjectStoreControllerTest` だけ、別系統へ切り替えるなら `ObjectDeleteControllerTest` か `ObjectUpdateControllerTest` のどちらか 1 file だけを選び、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は object 系も残 file を 1 件ずつ閉じる
+
+- 背景: `ObjectShowControllerTest` の整理後も、object 系では `ObjectStoreControllerTest`、`ObjectUpdateControllerTest`、`ObjectDeleteControllerTest` に同型の Bearer header 構築が残っていた。ここでも複数 file を一度に触ると分岐の多い object 系で差分確認が重くなるため、残件も 1 file 単位で閉じる必要があった
+- 決定事項: 今回は `tests/Feature/Api/ObjectStoreControllerTest.php` だけを `withAccessToken()` へ置換した。`ObjectUpdateControllerTest` と `ObjectDeleteControllerTest` は未変更のまま残し、object 系でも 1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、object 系の `ObjectDeleteControllerTest` か `ObjectUpdateControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は object 系の delete も 1 file で閉じる
+
+- 背景: `ObjectStoreControllerTest` の整理後も、object 系では `ObjectDeleteControllerTest` と `ObjectUpdateControllerTest` に同型の Bearer header 構築が残っていた。ここでも複数 file を同時に触ると object 系の分岐確認が重くなるため、delete と update も 1 file 単位で閉じる必要があった
+- 決定事項: 今回は `tests/Feature/Api/ObjectDeleteControllerTest.php` だけを `withAccessToken()` へ置換した。`ObjectUpdateControllerTest` は未変更のまま残し、object 系でも 1 file ごとの README 更新と test 実行を継続する
+- 影響範囲: `tests/Feature/Api/ObjectDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、object 系の `ObjectUpdateControllerTest` だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 横展開は object update を最後に object 系を一段落する
+
+- 背景: object 系の 1 file ずつの横展開を続けた結果、最後に残っていた Bearer header 直書きは `ObjectUpdateControllerTest` だけになっていた。ここを閉じれば object 系 CRUD も `withAccessToken()` へ一通り寄せられるため、次のテーマを別の重複パターン確認へ切り替えやすくなる
+- 決定事項: 今回は `tests/Feature/Api/ObjectUpdateControllerTest.php` の access token 付与 8 箇所だけを `withAccessToken()` へ置換した。validation / forbidden / move を含む assertion や fixture には追加変更を入れず、object 系の helper 横展開はこの file をもって一段落とする
+- 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に同じ観点で進める場合は、`tests/Feature/Api` 全体で `withAccessToken()` 置換が残っていないかを再点検し、残件が無ければ次の「挙動を変えない小さな共通化候補」を README を起点に洗い出す
+
+### API feature test の access token helper 残件は policy 系だけなので 1 file ずつ閉じる
+
+- 背景: `tests/Feature/Api` 全体を再点検した結果、`withHeader('Authorization', 'Bearer '.$this->buildAccessToken(...))` の残件は `PolicyShowControllerTest`、`PolicyDeleteControllerTest`、`PolicyStoreControllerTest`、`PolicyUpdateControllerTest` の 4 file に限られていた。残件が同一 resource 系に絞れたため、ここでも series を一括で触らず 1 file ごとの確認を維持する方が安全だった
+- 決定事項: 今回は最小の残件である `tests/Feature/Api/PolicyShowControllerTest.php` だけを `withAccessToken()` へ置換した。残る policy 系 3 file は未変更のまま残し、README 更新と対象 feature test 実行を 1 file ごとに継続する
+- 影響範囲: `tests/Feature/Api/PolicyShowControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、policy 系の `PolicyDeleteControllerTest`、`PolicyStoreControllerTest`、`PolicyUpdateControllerTest` のいずれか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 残件は policy delete も 1 file で閉じる
+
+- 背景: `PolicyShowControllerTest` の整理後も、policy 系では `PolicyDeleteControllerTest`、`PolicyStoreControllerTest`、`PolicyUpdateControllerTest` に同型の Bearer header 構築が残っていた。ここでも series をまとめて触らず 1 file ごとの確認を維持する方が安全だった
+- 決定事項: 今回は `tests/Feature/Api/PolicyDeleteControllerTest.php` だけを `withAccessToken()` へ置換した。残る policy 系 2 file は未変更のまま残し、README 更新と対象 feature test 実行を 1 file ごとに継続する
+- 影響範囲: `tests/Feature/Api/PolicyDeleteControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、policy 系の `PolicyStoreControllerTest` か `PolicyUpdateControllerTest` のどちらか 1 file だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 残件は policy store も 1 file で閉じる
+
+- 背景: `PolicyDeleteControllerTest` の整理後も、policy 系では `PolicyStoreControllerTest` と `PolicyUpdateControllerTest` に同型の Bearer header 構築が残っていた。ここでも series をまとめて触らず 1 file ごとの確認を維持する方が安全だった
+- 決定事項: 今回は `tests/Feature/Api/PolicyStoreControllerTest.php` だけを `withAccessToken()` へ置換した。残る policy 系 1 file は未変更のまま残し、README 更新と対象 feature test 実行を 1 file ごとに継続する
+- 影響範囲: `tests/Feature/Api/PolicyStoreControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、policy 系の残りである `PolicyUpdateControllerTest` だけを選び、同じく `withAccessToken()` への置換と対象 feature test 実行をセットで継続する
+
+### API feature test の access token helper 残件は policy update を最後に解消する
+
+- 背景: policy 系の 1 file ずつの横展開を続けた結果、最後に残っていた Bearer header 直書きは `PolicyUpdateControllerTest` だけになっていた。ここを閉じれば `tests/Feature/Api` の access token 直書きは一通り `withAccessToken()` へ寄せられ、次の小さな共通化候補へ移りやすくなる
+- 決定事項: 今回は `tests/Feature/Api/PolicyUpdateControllerTest.php` の access token 付与 2 箇所だけを `withAccessToken()` へ置換した。policy 系の helper 横展開はこの file をもって完了とし、次は `tests/Feature/Api` 全体で別の「挙動を変えない小さな共通化候補」を README を起点に再探索する
+- 影響範囲: `tests/Feature/Api/PolicyUpdateControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、`tests/Feature/Api` と基底 test case を再点検し、`withAccessToken()` 以外で still small かつ挙動非変更の共通化候補があるかを確認する。候補が無ければ、その時点で「今回の helper 横展開テーマは完了」と README に明示する
+
+### API feature test の次の小さな共通化候補は custom JWT の Bearer header 直書き
+
+- 背景: `withAccessToken()` の横展開完了後に `tests/Feature/Api` と基底 test case を再点検すると、access token 自動生成の直書きは消えた一方で、custom JWT を自前生成する `MeControllerTest` と `MeAuthorizationControllerTest` には `withHeader('Authorization', 'Bearer '.$token)` が残っていた。これは既存の `withAccessToken()` と同じ責務境界で薄く吸収できる
+- 決定事項: `tests/Concerns/InteractsWithKeycloakTokens.php` に `withBearerToken()` を追加し、`withAccessToken()` もその helper を経由する形へそろえた。最初の適用先は `tests/Feature/Api/MeControllerTest.php` のみに限定し、custom JWT を使う request header 構築だけを `withBearerToken($token)` へ置換した
+- 影響範囲: `tests/Concerns/InteractsWithKeycloakTokens.php`、`tests/Feature/Api/MeControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、残る custom JWT 系の `tests/Feature/Api/MeAuthorizationControllerTest.php` だけを `withBearerToken()` へ置換し、同じく README 更新と対象 feature test 実行をセットで継続する
+
+### API feature test の custom JWT Bearer helper は MeAuthorization で横展開を閉じる
+
+- 背景: `MeControllerTest` へ `withBearerToken()` を適用したあとも、custom JWT を自前生成する直書き Bearer header は `MeAuthorizationControllerTest` に残っていた。対象が 1 file に絞れたため、この段階で同じ helper へ寄せ切るのが最も小さな差分だった
+- 決定事項: 今回は `tests/Feature/Api/MeAuthorizationControllerTest.php` の custom JWT Bearer 付与 2 箇所だけを `withBearerToken()` へ置換した。これにより、`tests/Feature/Api` で確認できた Bearer header 直書きは `withAccessToken()` 系・custom JWT 系の両方で解消した
+- 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に進める場合は、`tests/Feature/Api` と基底 test case を再点検し、Bearer header 以外で still small かつ挙動非変更の共通化候補があるかを確認する。候補が見つからなければ、この helper 系の共通化テーマはいったん完了として README に明示する
+
+### API feature test の Bearer helper 共通化テーマはいったん完了とする
+
+- 背景: `tests/Feature/Api` と基底 test case を再点検した結果、Bearer header の直書きは `withAccessToken()` 系・custom JWT 系の両方で解消していた。一方で残る重複は、resource ごとの fixture 構築、`required_permissions` を含む 403 response の厳密 assertion、`MeAuthorizationControllerTest` の permission payload 組み立てなど、共通化すると test の読みやすさや責務境界を崩しやすいものが中心だった
+- 決定事項: 現時点では、Bearer helper 以外に「挙動を変えない小さな共通化候補」は追加採用しない。`assertForbidden()` の共通 helper 化や permission payload 取得の trait 化は、抽象化の利得よりも各 test の意図が見えにくくなる懸念が大きいため見送る
+- 影響範囲: `tests/Feature/Api` 配下の test helper 方針、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 側を整える場合は、共通化よりも「新しい重複が追加されていないか」の監視に切り替え、同種の request header 構築や helper 直書きが再発した時だけ今回の helper を再利用して小さく閉じる

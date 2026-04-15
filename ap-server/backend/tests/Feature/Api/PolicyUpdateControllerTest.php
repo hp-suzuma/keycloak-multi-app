@@ -20,8 +20,7 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Policy A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-update'))
+        $response = $this->withAccessToken('keycloak-user-policy-update')
             ->patchJson('/api/policies/'.$policy->id, [
                 'code' => ' Updated_Policy ',
                 'name' => 'Updated Policy',
@@ -61,8 +60,7 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Policy A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-move'))
+        $response = $this->withAccessToken('keycloak-user-policy-move')
             ->patchJson('/api/policies/'.$policy->id, [
                 'scope_id' => $targetScope->id,
                 'name' => 'Moved Policy',

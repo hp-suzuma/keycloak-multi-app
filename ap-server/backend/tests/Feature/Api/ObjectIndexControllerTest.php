@@ -16,8 +16,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
     {
         $tenantScope = $this->assignRole('keycloak-user-objects', 'tenant_viewer');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-objects'))
+        $response = $this->withAccessToken('keycloak-user-objects')
             ->getJson('/api/objects');
 
         $response
@@ -81,8 +80,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Other Object',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-server-admin'))
+        $response = $this->withAccessToken('keycloak-user-server-admin')
             ->getJson('/api/objects');
 
         $response
@@ -153,8 +151,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Tenant B Object',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-tenant-viewer'))
+        $response = $this->withAccessToken('keycloak-user-tenant-viewer')
             ->getJson('/api/objects');
 
         $response
@@ -218,8 +215,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Forbidden Object',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-filter'))
+        $response = $this->withAccessToken('keycloak-user-filter')
             ->getJson('/api/objects?scope_id='.$tenantScope->id.'&code=%20Target_Object%20');
 
         $response
@@ -277,8 +273,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Object 3',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-page'))
+        $response = $this->withAccessToken('keycloak-user-page')
             ->getJson('/api/objects?page=2&per_page=2');
 
         $response
@@ -336,8 +331,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             'name' => 'Ignored Name',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-sort'))
+        $response = $this->withAccessToken('keycloak-user-sort')
             ->getJson('/api/objects?name=Target&sort=code');
 
         $response

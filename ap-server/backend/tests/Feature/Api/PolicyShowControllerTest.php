@@ -19,8 +19,7 @@ class PolicyShowControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Tenant Policy',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-show'))
+        $response = $this->withAccessToken('keycloak-user-policy-show')
             ->getJson('/api/policies/'.$policy->id);
 
         $response

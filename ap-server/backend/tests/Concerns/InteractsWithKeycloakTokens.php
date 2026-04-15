@@ -62,6 +62,16 @@ trait InteractsWithKeycloakTokens
         ]);
     }
 
+    protected function withBearerToken(string $token): static
+    {
+        return $this->withHeader('Authorization', 'Bearer '.$token);
+    }
+
+    protected function withAccessToken(string $subject): static
+    {
+        return $this->withBearerToken($this->buildAccessToken($subject));
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */

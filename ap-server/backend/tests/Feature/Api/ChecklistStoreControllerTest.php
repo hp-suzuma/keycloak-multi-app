@@ -13,8 +13,7 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
     {
         $scope = $this->assignRole('keycloak-user-checklist-store', 'tenant_admin');
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-store'))
+        $response = $this->withAccessToken('keycloak-user-checklist-store')
             ->postJson('/api/checklists', [
                 'scope_id' => $scope->id,
                 'code' => ' Tenant_Checklist ',
@@ -48,8 +47,7 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Existing Checklist',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-checklist-store-dup'))
+        $response = $this->withAccessToken('keycloak-user-checklist-store-dup')
             ->postJson('/api/checklists', [
                 'scope_id' => $scope->id,
                 'code' => ' Tenant_Checklist ',

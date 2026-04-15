@@ -19,8 +19,7 @@ class PolicyDeleteControllerTest extends UpsertAuthorizationApiTestCase
             'name' => 'Policy A',
         ]);
 
-        $response = $this
-            ->withHeader('Authorization', 'Bearer '.$this->buildAccessToken('keycloak-user-policy-delete'))
+        $response = $this->withAccessToken('keycloak-user-policy-delete')
             ->deleteJson('/api/policies/'.$policy->id);
 
         $response->assertNoContent();
