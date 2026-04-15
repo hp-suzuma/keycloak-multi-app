@@ -14,11 +14,11 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
         $scope = $this->assignRole('keycloak-user-checklist-store', 'tenant_admin');
 
         $response = $this->withAccessToken('keycloak-user-checklist-store')
-            ->postJson('/api/checklists', [
-                'scope_id' => $scope->id,
-                'code' => ' Tenant_Checklist ',
-                'name' => 'Tenant Checklist',
-            ]);
+            ->postJson('/api/checklists', $this->checklistPayload(
+                $scope->id,
+                ' Tenant_Checklist ',
+                'Tenant Checklist',
+            ));
 
         $response
             ->assertCreated()
@@ -48,11 +48,11 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
         ]);
 
         $response = $this->withAccessToken('keycloak-user-checklist-store-dup')
-            ->postJson('/api/checklists', [
-                'scope_id' => $scope->id,
-                'code' => ' Tenant_Checklist ',
-                'name' => 'Duplicated Checklist',
-            ]);
+            ->postJson('/api/checklists', $this->checklistPayload(
+                $scope->id,
+                ' Tenant_Checklist ',
+                'Duplicated Checklist',
+            ));
 
         $this->assertDuplicateCodeValidationResponse($response);
     }
@@ -67,5 +67,17 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
             ]);
+    }
+
+    /**
+     * @return array{scope_id: int, code: string, name: string}
+     */
+    private function checklistPayload(int $scopeId, string $code, string $name): array
+    {
+        return [
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
     }
 }

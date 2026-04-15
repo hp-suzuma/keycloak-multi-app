@@ -40,16 +40,8 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
 
     public function test_it_rejects_moving_a_policy_to_another_scope(): void
     {
-        $currentScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-policy-current',
-            'name' => 'Tenant Policy Current',
-        ]);
-        $targetScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-policy-target',
-            'name' => 'Tenant Policy Target',
-        ]);
+        $currentScope = $this->createTenantScope('tenant-policy-current', 'Tenant Policy Current');
+        $targetScope = $this->createTenantScope('tenant-policy-target', 'Tenant Policy Target');
 
         $this->assignRole('keycloak-user-policy-move', 'tenant_operator', $currentScope);
         $this->assignRole('keycloak-user-policy-move', 'tenant_admin', $targetScope);
@@ -79,5 +71,14 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
                     'scope_id' => ['Policy scope cannot be changed after creation.'],
                 ],
             ]);
+    }
+
+    private function createTenantScope(string $code, string $name): Scope
+    {
+        return Scope::query()->create([
+            'layer' => 'tenant',
+            'code' => $code,
+            'name' => $name,
+        ]);
     }
 }

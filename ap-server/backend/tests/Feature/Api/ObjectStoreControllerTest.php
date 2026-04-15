@@ -28,17 +28,9 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
 
     public function test_it_returns_forbidden_when_the_target_scope_is_not_accessible(): void
     {
-        $accessibleScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-a',
-            'name' => 'Tenant A',
-        ]);
+        $accessibleScope = $this->createTenantScope('tenant-a', 'Tenant A');
 
-        $forbiddenScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-b',
-            'name' => 'Tenant B',
-        ]);
+        $forbiddenScope = $this->createTenantScope('tenant-b', 'Tenant B');
 
         $this->assignRole('keycloak-user-2', 'tenant_admin', $accessibleScope);
 
@@ -56,12 +48,7 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
     {
         $serverScope = $this->assignRole('keycloak-user-3', 'server_admin');
 
-        $tenantScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-a',
-            'name' => 'Tenant A',
-            'parent_scope_id' => $serverScope->id,
-        ]);
+        $tenantScope = $this->createTenantScope('tenant-a', 'Tenant A', $serverScope->id);
 
         $response = $this->withAccessToken('keycloak-user-3')
             ->postJson('/api/objects', [
@@ -132,5 +119,15 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
             ]);
+    }
+
+    private function createTenantScope(string $code, string $name, ?int $parentScopeId = null): Scope
+    {
+        return Scope::query()->create(array_filter([
+            'layer' => 'tenant',
+            'code' => $code,
+            'name' => $name,
+            'parent_scope_id' => $parentScopeId,
+        ], static fn ($value) => $value !== null));
     }
 }

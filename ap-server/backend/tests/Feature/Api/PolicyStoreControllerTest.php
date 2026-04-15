@@ -14,11 +14,11 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
         $scope = $this->assignRole('keycloak-user-policy-store', 'tenant_admin');
 
         $response = $this->withAccessToken('keycloak-user-policy-store')
-            ->postJson('/api/policies', [
-                'scope_id' => $scope->id,
-                'code' => ' Tenant_Policy ',
-                'name' => 'Tenant Policy',
-            ]);
+            ->postJson('/api/policies', $this->policyPayload(
+                $scope->id,
+                ' Tenant_Policy ',
+                'Tenant Policy',
+            ));
 
         $response
             ->assertCreated()
@@ -48,11 +48,11 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
         ]);
 
         $response = $this->withAccessToken('keycloak-user-policy-store-dup')
-            ->postJson('/api/policies', [
-                'scope_id' => $scope->id,
-                'code' => ' Tenant_Policy ',
-                'name' => 'Duplicated Policy',
-            ]);
+            ->postJson('/api/policies', $this->policyPayload(
+                $scope->id,
+                ' Tenant_Policy ',
+                'Duplicated Policy',
+            ));
 
         $this->assertDuplicateCodeValidationResponse($response);
     }
@@ -67,5 +67,17 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
             ]);
+    }
+
+    /**
+     * @return array{scope_id: int, code: string, name: string}
+     */
+    private function policyPayload(int $scopeId, string $code, string $name): array
+    {
+        return [
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
     }
 }

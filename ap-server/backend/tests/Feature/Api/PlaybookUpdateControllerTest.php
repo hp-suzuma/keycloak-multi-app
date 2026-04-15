@@ -37,16 +37,8 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
 
     public function test_it_moves_the_playbook_when_the_user_can_update_current_scope_and_create_in_target_scope(): void
     {
-        $currentScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-current',
-            'name' => 'Tenant Current',
-        ]);
-        $targetScope = Scope::query()->create([
-            'layer' => 'tenant',
-            'code' => 'tenant-target',
-            'name' => 'Tenant Target',
-        ]);
+        $currentScope = $this->createTenantScope('tenant-current', 'Tenant Current');
+        $targetScope = $this->createTenantScope('tenant-target', 'Tenant Target');
 
         $this->assignRole('keycloak-user-playbook-move', 'tenant_operator', $currentScope);
         $this->assignRole('keycloak-user-playbook-move', 'tenant_admin', $targetScope);
@@ -84,5 +76,14 @@ class PlaybookUpdateControllerTest extends UpsertAuthorizationApiTestCase
                     'name' => $name,
                 ],
             ]);
+    }
+
+    private function createTenantScope(string $code, string $name): Scope
+    {
+        return Scope::query()->create([
+            'layer' => 'tenant',
+            'code' => $code,
+            'name' => $name,
+        ]);
     }
 }

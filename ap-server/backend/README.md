@@ -1195,3 +1195,52 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertObjectResponse()` を追加し、success response assertion を file 内 helper に寄せた。既存の forbidden / not found / duplicate validation helper と役割が分かれるようにし、DB assertion は各 test に残した
 - 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の success response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、show/store/update を中心に、同じ shape の success response や payload 配列が 1 file 内で 2 回以上出る候補を引き続き小さく整える
+
+### Playbook store controller test の request payload を file 内 helper に寄せる
+
+- 背景: `PlaybookStoreControllerTest` を見直すと、作成成功時と duplicate validation 時で `postJson()` に渡す payload 配列の shape が同じまま 2 回並んでいた。store 系では response assertion より入力差分を読みたいので、payload の骨格だけ helper に寄せる方が本文の意図を追いやすかった
+- 決定事項: `tests/Feature/Api/PlaybookStoreControllerTest.php` に `playbookPayload()` を追加し、`scope_id` / `code` / `name` を持つ request payload 配列を file 内 helper に寄せた。success response assertion は 1 回だけなので helper 化せず、そのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookStoreControllerTest.php`、playbook store test の request payload 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、同じ store 系の checklist/policy や show 系を見直しつつ、1 file 内で payload 配列や success response の shape が 2 回以上揃っている候補だけを同じ粒度で小さく整える
+
+### Checklist / Policy store controller test の request payload を file 内 helper に寄せる
+
+- 背景: `PlaybookStoreControllerTest` と同じ観点で `ChecklistStoreControllerTest` と `PolicyStoreControllerTest` を見直すと、どちらも作成成功時と duplicate validation 時で `postJson()` に渡す payload 配列の shape が 2 回ずつ並んでいた。store 系の本文では入力値の違いだけを追える方が読みやすいため、同じ粒度で payload の骨格だけを helper に寄せた
+- 決定事項: `tests/Feature/Api/ChecklistStoreControllerTest.php` に `checklistPayload()`、`tests/Feature/Api/PolicyStoreControllerTest.php` に `policyPayload()` を追加し、`scope_id` / `code` / `name` を持つ request payload 配列を各 file 内 helper に寄せた。response assertion や duplicate validation helper は役割が分かれているので、そのまま残した
+- 影響範囲: `tests/Feature/Api/ChecklistStoreControllerTest.php`、`tests/Feature/Api/PolicyStoreControllerTest.php`、store test の request payload 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、show 系の `ObjectShowControllerTest` などを見直しつつ、1 file 内で `Not Found` / `Forbidden` / success response の shape が 2 回以上揃っている候補だけを小さく整える
+
+### Object show controller test の tenant scope 作成 payload を file 内 helper に寄せる
+
+- 背景: show 系を見直すと success response 自体は各 file で 1 回ずつしか出ていなかったが、`ObjectShowControllerTest` では `Scope::query()->create([...])` に渡す tenant scope 用の配列が 1 file 内で複数回繰り返されていた。show test では権限制御と取得結果を読みたいので、scope 作成 payload の骨格だけ helper に寄せると本文の視線移動を減らせた
+- 決定事項: `tests/Feature/Api/ObjectShowControllerTest.php` に `createTenantScope()` を追加し、tenant scope 作成時の `layer` / `code` / `name` / `parent_scope_id` 配列を file 内 helper に寄せた。forbidden / not found helper と success response assertion は役割が分かれているため、そのまま残した
+- 影響範囲: `tests/Feature/Api/ObjectShowControllerTest.php`、object show test の scope 作成記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、show/store/update をもう一巡して、1 file 内で shape の重複がまだ 2 回以上ある payload や response だけを拾い、helper 化の効果が薄い file には手を広げない
+
+### Playbook / Policy update controller test の tenant scope 作成 payload を file 内 helper に寄せる
+
+- 背景: show 系の次に update 系を再走査すると、`PlaybookUpdateControllerTest` と `PolicyUpdateControllerTest` の move 関連 test で `Scope::query()->create([...])` に渡す tenant scope 用の配列がそれぞれ 2 回並んでいた。update test では移動可否や response の差分を読みたいので、scope 作成 payload の骨格だけ helper に寄せる方が本文を追いやすかった
+- 決定事項: `tests/Feature/Api/PlaybookUpdateControllerTest.php` と `tests/Feature/Api/PolicyUpdateControllerTest.php` に `createTenantScope()` を追加し、tenant scope 作成時の `layer` / `code` / `name` 配列を各 file 内 helper に寄せた。既存の success response helper や validation helper は役割が分かれているため、そのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookUpdateControllerTest.php`、`tests/Feature/Api/PolicyUpdateControllerTest.php`、update test の scope 作成記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、`ObjectStoreControllerTest` や `ObjectUpdateControllerTest` のように複数種の helper が混在する file を見直しつつ、同じ shape が 2 回以上あっても helper の責務が増えすぎる場合は無理に寄せず、その判断も README に残す
+
+### Object 系 test では store の scope helper だけ追加し、update は現状維持にする
+
+- 背景: `ObjectStoreControllerTest` と `ObjectUpdateControllerTest` を見直すと、どちらも tenant scope 作成配列の重複は残っていた。一方で `ObjectUpdateControllerTest` は success / forbidden / not found / duplicate validation helper がすでに共存しており、ここに scope helper まで足すと file 内 helper の責務が増えすぎて、かえって読み筋が分かれやすかった
+- 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` には `createTenantScope()` を追加して scope 作成配列だけを小さく寄せる。`tests/Feature/Api/ObjectUpdateControllerTest.php` は今回あえて触らず、既存 helper 群の役割分担を優先する
+- 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の scope 作成記述、`ObjectUpdateControllerTest` の helper 採用判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、同じく helper が多い file では「重複削減」より「役割の明瞭さ」を優先し、変更しない判断も含めて 1 file 単位で README に残す
+
+### 残りの show 系は helper を増やさず現状維持にする
+
+- 背景: 上の基準に沿って `PlaybookShowControllerTest`、`PolicyShowControllerTest`、`ChecklistShowControllerTest` を見直したところ、`PolicyShowControllerTest` と `ChecklistShowControllerTest` は success response が 1 回だけで、helper 化できる同型 payload が実質なかった。`PlaybookShowControllerTest` には tenant scope 作成配列の近い形が 2 箇所あるものの、file 自体が短く、forbidden helper 以外を増やすほどの重複量ではなかった
+- 決定事項: show 系の残候補には今回は helper を追加しない。とくに `PlaybookShowControllerTest` は、scope 作成 payload の小さな重複よりも file の短さと既存の読みやすさを優先して現状維持にする
+- 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、`tests/Feature/Api/PolicyShowControllerTest.php`、`tests/Feature/Api/ChecklistShowControllerTest.php` の helper 採用判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、新しい重複候補を足す前に、まず今回までに現状維持とした file 群の判断を前提にし、helper を増やすなら本文の読みやすさが明確に上がる file に限定する
+
+### show/store/update の helper 整理はいったん打ち止めにする
+
+- 背景: 直近の基準に沿って show/store/update を再走査し、`MeControllerTest` のように helper 化の効果が大きい長めの file と比べてみると、残り候補は「shape の重複はあるが file が短い」か「既存 helper が多く責務が増えすぎる」のどちらかに寄っていた。これ以上の追加は、重複削減より helper 数の増加が先に目立ちやすかった
+- 決定事項: 現時点の show/store/update 整理はここでいったん止める。今後は新しい重複候補を機械的に追わず、本文の読みやすさが明確に改善する長い file が見つかったときだけ再開する
+- 影響範囲: `tests/Feature/Api` の helper 追加判断、show/store/update 整理シリーズの継続条件、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、このシリーズを続けるより、別の明確な読みづらさや保守コストの高い file を起点に新しい小タスクを切る

@@ -21,11 +21,11 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
         ]);
 
         $response = $this->withAccessToken('keycloak-user-playbook-store')
-            ->postJson('/api/playbooks', [
-                'scope_id' => $tenantScope->id,
-                'code' => ' Tenant_Playbook ',
-                'name' => 'Tenant Playbook',
-            ]);
+            ->postJson('/api/playbooks', $this->playbookPayload(
+                $tenantScope->id,
+                ' Tenant_Playbook ',
+                'Tenant Playbook',
+            ));
 
         $response
             ->assertCreated()
@@ -50,11 +50,11 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
         ]);
 
         $response = $this->withAccessToken('keycloak-user-playbook-store-dup')
-            ->postJson('/api/playbooks', [
-                'scope_id' => $scope->id,
-                'code' => ' Tenant_Playbook ',
-                'name' => 'Duplicated Playbook',
-            ]);
+            ->postJson('/api/playbooks', $this->playbookPayload(
+                $scope->id,
+                ' Tenant_Playbook ',
+                'Duplicated Playbook',
+            ));
 
         $this->assertDuplicateCodeValidationResponse($response);
     }
@@ -69,5 +69,17 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                     'code' => ['The code has already been taken within the target scope.'],
                 ],
             ]);
+    }
+
+    /**
+     * @return array{scope_id: int, code: string, name: string}
+     */
+    private function playbookPayload(int $scopeId, string $code, string $name): array
+    {
+        return [
+            'scope_id' => $scopeId,
+            'code' => $code,
+            'name' => $name,
+        ];
     }
 }
