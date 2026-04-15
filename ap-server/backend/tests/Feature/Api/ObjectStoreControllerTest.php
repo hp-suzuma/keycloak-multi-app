@@ -111,14 +111,9 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
 
     private function assertDuplicateCodeValidationResponse($response): void
     {
-        $response
-            ->assertUnprocessable()
-            ->assertExactJson([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'code' => ['The code has already been taken within the target scope.'],
-                ],
-            ]);
+        $this->assertValidationFailedResponse($response, [
+            'code' => ['The code has already been taken within the target scope.'],
+        ]);
     }
 
     private function createTenantScope(string $code, string $name, ?int $parentScopeId = null): Scope
@@ -129,5 +124,18 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
             'name' => $name,
             'parent_scope_id' => $parentScopeId,
         ], static fn ($value) => $value !== null));
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $errors
+     */
+    private function assertValidationFailedResponse($response, array $errors): void
+    {
+        $response
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Validation failed',
+                'errors' => $errors,
+            ]);
     }
 }

@@ -1307,3 +1307,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertValidationFailedResponse()` を追加し、`message` と `errors` を持つ validation response の外側 shape を helper に寄せた。`assertDuplicateCodeValidationResponse()` はその wrapper として残し、`assertJsonValidationErrors()` を使うケースや forbidden / not found helper は現状維持にした
 - 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の validation response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、同じく長めの object 系 file を見ながら、forbidden や validation の外側 shape が 2 回以上出ている箇所だけを file 内 helper に寄せる
+
+### Object store controller test も validation failed shape だけを揃える
+
+- 背景: object 系の残りを見直すと、`ObjectShowControllerTest` と `ObjectDeleteControllerTest` は `forbidden` / `not found` をすでに file 内 helper に寄せており、今回の基準で追加の余地は小さかった。一方で `ObjectStoreControllerTest` は `Validation failed` の外側 shape が `ObjectUpdateControllerTest` と同じ形で残っていたため、object store / update の validation helper 粒度だけがまだずれていた
+- 決定事項: `tests/Feature/Api/ObjectStoreControllerTest.php` に `assertValidationFailedResponse()` を追加し、重複 code の validation response で `message` と `errors` を持つ外側 shape を helper に寄せた。`assertJsonValidationErrors()` を使う invalid payload case、`assertForbiddenResponse()`、success response の記述は現状維持にした
+- 影響範囲: `tests/Feature/Api/ObjectStoreControllerTest.php`、object store test の validation response assertion 記述、object 系 validation helper の粒度、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、object 系 helper の追加はいったん止めて、別の長めの file で validation や forbidden response の外側 shape が複数回出ている箇所があるかを探す
