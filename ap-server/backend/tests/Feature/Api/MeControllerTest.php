@@ -15,11 +15,7 @@ class MeControllerTest extends KeycloakApiTestCase
     {
         $response = $this->getJson('/api/me');
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'current_user' => null,
-            ]);
+        $this->assertNullCurrentUserResponse($response);
     }
 
     public function test_it_returns_the_current_user_when_authenticated(): void
@@ -34,11 +30,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => $user->id,
-                    'name' => 'AP User',
-                    'email' => 'ap-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload($user->id, 'AP User', 'ap-user@example.com'),
             ]);
     }
 
@@ -60,11 +52,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-1',
-                    'name' => 'kc-user',
-                    'email' => 'kc-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-1', 'kc-user', 'kc-user@example.com'),
             ]);
     }
 
@@ -105,11 +93,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-2',
-                    'name' => 'kid-user@example.com',
-                    'email' => 'kid-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-2', 'kid-user@example.com', 'kid-user@example.com'),
             ]);
     }
 
@@ -126,11 +110,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'current_user' => null,
-            ]);
+        $this->assertNullCurrentUserResponse($response);
     }
 
     public function test_it_rejects_an_unsigned_keycloak_bearer_token(): void
@@ -153,11 +133,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'current_user' => null,
-            ]);
+        $this->assertNullCurrentUserResponse($response);
     }
 
     public function test_it_rejects_a_keycloak_token_when_the_kid_is_not_found_in_jwks(): void
@@ -175,11 +151,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response = $this->withBearerToken($token)
             ->getJson('/api/me');
 
-        $response
-            ->assertOk()
-            ->assertExactJson([
-                'current_user' => null,
-            ]);
+        $this->assertNullCurrentUserResponse($response);
     }
 
     public function test_it_resolves_the_jwks_url_via_openid_connect_discovery(): void
@@ -212,11 +184,7 @@ class MeControllerTest extends KeycloakApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-3',
-                    'name' => 'discovery-user@example.com',
-                    'email' => 'discovery-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-3', 'discovery-user@example.com', 'discovery-user@example.com'),
             ]);
     }
 
@@ -248,11 +216,25 @@ class MeControllerTest extends KeycloakApiTestCase
         $response
             ->assertOk()
             ->assertExactJson([
-                'current_user' => [
-                    'id' => 'keycloak-user-4',
-                    'name' => 'fallback-user@example.com',
-                    'email' => 'fallback-user@example.com',
-                ],
+                'current_user' => $this->currentUserPayload('keycloak-user-4', 'fallback-user@example.com', 'fallback-user@example.com'),
             ]);
+    }
+
+    private function assertNullCurrentUserResponse($response): void
+    {
+        $response
+            ->assertOk()
+            ->assertExactJson([
+                'current_user' => null,
+            ]);
+    }
+
+    private function currentUserPayload(int|string $id, string $name, string $email): array
+    {
+        return [
+            'id' => $id,
+            'name' => $name,
+            'email' => $email,
+        ];
     }
 }

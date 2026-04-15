@@ -1160,3 +1160,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/MeAuthorizationControllerTest.php` に `currentUserPayload()` を追加し、`current_user` の固定 shape を file 内 helper に寄せた。assignment / permission payload はテスト意図の中心で個別性が高いため、そのまま残した
 - 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、me authorization test の current_user assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、unused import の再走査を続けつつ、今回と同じく長い assertion の中で shape だけが重複している 1 file 候補があれば小さく整える
+
+### Me controller test の current_user assertion を file 内 helper に寄せる
+
+- 背景: `MeControllerTest` を見直すと、`current_user` の object payload が複数箇所で同じ shape を保っており、`current_user => null` の response も複数回繰り返していた。認証経路ごとの違いを追う test なので、payload の shape より「どの入力で user が返るか / 返らないか」を本文で見やすくしたかった
+- 決定事項: `tests/Feature/Api/MeControllerTest.php` に `currentUserPayload()` と `assertNullCurrentUserResponse()` を追加し、`current_user` の同型 assertion を file 内 helper に寄せた。JWKS discovery や token 条件の前提は各 test に固有なので、その周辺ロジックはそのまま残した
+- 影響範囲: `tests/Feature/Api/MeControllerTest.php`、me controller test の current_user assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、unused import の再走査を続けつつ、`Me*` 系以外でも長い response assertion の中で shape だけが重複している 1 file 候補があれば小さく整える
