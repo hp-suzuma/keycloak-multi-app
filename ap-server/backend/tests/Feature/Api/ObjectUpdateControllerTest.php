@@ -43,14 +43,9 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
         $response = $this->withAccessToken('keycloak-user-empty')
             ->patchJson('/api/objects/'.$managedObject->id, []);
 
-        $response
-            ->assertUnprocessable()
-            ->assertExactJson([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'payload' => ['At least one of scope_id, code, or name is required.'],
-                ],
-            ]);
+        $this->assertValidationFailedResponse($response, [
+            'payload' => ['At least one of scope_id, code, or name is required.'],
+        ]);
     }
 
     public function test_it_returns_not_found_when_the_object_does_not_exist(): void
@@ -254,14 +249,9 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
 
     private function assertDuplicateCodeValidationResponse($response): void
     {
-        $response
-            ->assertUnprocessable()
-            ->assertExactJson([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'code' => ['The code has already been taken within the target scope.'],
-                ],
-            ]);
+        $this->assertValidationFailedResponse($response, [
+            'code' => ['The code has already been taken within the target scope.'],
+        ]);
     }
 
     private function assertObjectResponse($response, int $objectId, int $scopeId, string $code, string $name): void
@@ -275,6 +265,19 @@ class ObjectUpdateControllerTest extends UpsertAuthorizationApiTestCase
                     'code' => $code,
                     'name' => $name,
                 ],
+            ]);
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $errors
+     */
+    private function assertValidationFailedResponse($response, array $errors): void
+    {
+        $response
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Validation failed',
+                'errors' => $errors,
             ]);
     }
 }

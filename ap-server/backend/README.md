@@ -1300,3 +1300,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PolicyUpdateControllerTest.php` に `assertPolicyResponse()` を追加し、success response の `id` / `scope_id` / `code` / `name` shape を helper に寄せた。`assertScopeImmutableValidationResponse()` と `createTenantScope()` は既存の責務のまま維持し、update 系 helper の粒度を他 resource と合わせた
 - 影響範囲: `tests/Feature/Api/PolicyUpdateControllerTest.php`、update 系 resource test の success response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、resource 横断の系列整理はいったん打ち止めにして、validation や forbidden response の重複が長めの file で本文を重くしている箇所があるかを探す
+
+### Object update controller test の validation failed shape を file 内 helper に寄せる
+
+- 背景: resource 横断の系列整理を終えた後に長めの file を見直すと、`ObjectUpdateControllerTest` は success / forbidden / not found helper がある一方で、`Validation failed` の外側 shape だけが「未入力 payload」と「重複 code」の 2 箇所で繰り返されていた。差分として読みたいのは各 `errors` の中身なので、外側だけを helper に寄せると本文の見通しを少し揃えやすかった
+- 決定事項: `tests/Feature/Api/ObjectUpdateControllerTest.php` に `assertValidationFailedResponse()` を追加し、`message` と `errors` を持つ validation response の外側 shape を helper に寄せた。`assertDuplicateCodeValidationResponse()` はその wrapper として残し、`assertJsonValidationErrors()` を使うケースや forbidden / not found helper は現状維持にした
+- 影響範囲: `tests/Feature/Api/ObjectUpdateControllerTest.php`、object update test の validation response assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、同じく長めの object 系 file を見ながら、forbidden や validation の外側 shape が 2 回以上出ている箇所だけを file 内 helper に寄せる
