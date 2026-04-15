@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class BearerTokenHelperUsageTest extends TestCase
 {
-    public function test_feature_api_tests_do_not_inline_bearer_authorization_headers(): void
+    public function test_backend_tests_do_not_inline_bearer_authorization_headers(): void
     {
         $testDirectory = base_path('tests');
         $currentFile = realpath(__FILE__);

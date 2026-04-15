@@ -1013,3 +1013,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の走査対象を `base_path('tests')` へ広げ、`tests/Concerns` だけを除外する形にした。これにより backend test 全体で Bearer header のその場組み立てを検知しつつ、helper 実装自身の責務は監視対象から外す
 - 影響範囲: `ap-server/backend/tests` 配下の Bearer token 利用方針、`tests/Feature/Api/BearerTokenHelperUsageTest.php` の監視範囲、`ap-server/backend/README.md`
 - 次の推奨アクション: 今後 backend test を追加して監視テストが落ちた場合は、まず `withAccessToken()` か `withBearerToken()` への置換で解消する。もし `tests/Concerns` 以外で Bearer header の組み立てを残す必要が出た場合だけ、その理由と責務境界を README に記録してから例外扱いを検討する
+
+### Bearer header の重複監視テーマはいったん定常運用へ移す
+
+- 背景: 監視テストの検知パターン拡張と backend test 全体への適用まで完了し、`ap-backend` コンテナで backend 全体の test が通ることも確認できた。この段階でさらに先回りした抽象化や監視拡張を足すと、重複抑止より監視ロジック自体の複雑化が先に増える
+- 決定事項: Bearer header の重複監視テーマは、現時点では追加の proactive 実装を行わず定常運用へ移す。監視テスト名も backend 全体を見ている実態に合わせ、意図が読み取りやすい名前へそろえる
+- 影響範囲: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の命名、backend test の Bearer header 運用方針、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、このテーマを広げ続けるのではなく、README の別テーマとして「挙動非変更で閉じる小さな重複」や「監視テストで拾いにくい新しいノイズ」を再探索する
