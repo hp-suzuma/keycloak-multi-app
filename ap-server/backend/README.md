@@ -1027,3 +1027,10 @@ php artisan test
 - 決定事項: `assignRole()` 本体は `AuthorizationApiTestCase` へ移し、子クラス側は `prepareAuthorizationUser()` だけを実装する形に整理した。`create` と `updateOrCreate` の使い分けは従来どおり各子クラスに残し、role 付与の主処理だけを親へ寄せた
 - 影響範囲: `tests/Feature/Api/AuthorizationApiTestCase.php`、`tests/Feature/Api/CreateAuthorizationApiTestCase.php`、`tests/Feature/Api/UpsertAuthorizationApiTestCase.php`、これらを継承する authorization 系 API test
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく「子クラス間で流れは同じだが差し替え点が 1 箇所だけ」の補助処理が他にないかを確認する。候補が無ければ、以降は import や assertion message などよりノイズ寄りの整形候補へ切り替える
+
+### 子クラス差し替え型の test helper 共通化候補はいったん出尽くした
+
+- 背景: `assignRole()` 整理後に `tests/Feature/Api` の補助メソッドと index 系 trait / base test case を再点検したが、追加で見つかった独自 helper は `ApiRoutePermissionPolicyTest` 内の route assertion や `MeAuthorizationControllerTest` の permission payload 取得など、個別 test の文脈に強く結びつくものが中心だった。`ScopedIndexValidationApiTestCase` と `InteractsWithScopedIndexValidation` はすでに責務境界が薄く、今回と同型の差し替えポイントも残っていなかった
+- 決定事項: 現時点では「子クラス間で流れは同じだが差し替え点が 1 箇所だけ」の補助処理について、追加の共通化は採用しない。このテーマはここでいったん完了とし、今後は import や assertion message など、よりノイズ寄りで安全に閉じる整形候補の探索へ切り替える
+- 影響範囲: `tests/Feature/Api` 配下の test helper 方針、共通化探索の打ち止め判断、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、未使用 import、命名のずれ、assertion message の重複など「挙動に影響しないノイズ」を 1 file または 1 パターンずつ確認し、小さく閉じる
