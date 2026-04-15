@@ -14,12 +14,7 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
     {
         $response = $this->getJson('/api/playbooks');
 
-        $response
-            ->assertForbidden()
-            ->assertExactJson([
-                'message' => 'Forbidden',
-                'required_permissions' => ['object.read'],
-            ]);
+        $this->assertForbiddenResponse($response, ['object.read']);
     }
 
     public function test_it_returns_only_playbooks_in_accessible_scopes(): void
@@ -159,5 +154,18 @@ class PlaybookIndexControllerTest extends ScopedIndexValidationApiTestCase
     public function test_it_rejects_invalid_query_filters(): void
     {
         $this->assertIndexRejectsInvalidFilters('/api/playbooks');
+    }
+
+    /**
+     * @param  array<int, string>  $requiredPermissions
+     */
+    private function assertForbiddenResponse($response, array $requiredPermissions): void
+    {
+        $response
+            ->assertForbidden()
+            ->assertExactJson([
+                'message' => 'Forbidden',
+                'required_permissions' => $requiredPermissions,
+            ]);
     }
 }

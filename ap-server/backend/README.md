@@ -1083,3 +1083,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookShowControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。成功系の `data` assertion は個別性が高いためそのまま残した
 - 影響範囲: `tests/Feature/Api/PlaybookShowControllerTest.php`、playbook show test の forbidden response 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Playbook index controller test の forbidden response 記述も近接 file とそろえる
+
+- 背景: `PlaybookShowControllerTest` に続いて `PlaybookIndexControllerTest` を確認すると、こちらも permission 不足時の固定 forbidden response を直接書いていた。index の成功系 assertion は pagination/filter の差分が大きい一方、forbidden response は固定形なので、file 内 helper 化しても読みやすさを崩さなかった
+- 決定事項: `tests/Feature/Api/PlaybookIndexControllerTest.php` に `assertForbiddenResponse()` を追加し、固定 payload の forbidden assertion を file 内 helper へ寄せた。index 成功系と invalid filter の assertion は個別性が高いためそのまま残した
+- 影響範囲: `tests/Feature/Api/PlaybookIndexControllerTest.php`、playbook index test の forbidden response 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
