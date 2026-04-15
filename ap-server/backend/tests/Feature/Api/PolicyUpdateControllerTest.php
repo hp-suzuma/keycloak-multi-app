@@ -66,9 +66,14 @@ class PolicyUpdateControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Moved Policy',
             ]);
 
+        $this->assertScopeImmutableValidationResponse($response);
+    }
+
+    private function assertScopeImmutableValidationResponse($response): void
+    {
         $response
             ->assertUnprocessable()
-            ->assertJson([
+            ->assertExactJson([
                 'message' => 'Validation failed',
                 'errors' => [
                     'scope_id' => ['Policy scope cannot be changed after creation.'],
