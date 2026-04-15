@@ -23,18 +23,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(0),
             ]);
     }
 
@@ -100,18 +89,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
                         'name' => 'Tenant Object',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(2),
             ]);
     }
 
@@ -165,18 +143,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
                         'name' => 'Tenant A Object',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 1,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(1),
             ]);
     }
 
@@ -229,18 +196,10 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
                         'name' => 'Target Object',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 1,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => $tenantScope->id,
-                        'code' => 'target-object',
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(1, [
+                    'scope_id' => $tenantScope->id,
+                    'code' => 'target-object',
+                ]),
             ]);
     }
 
@@ -287,18 +246,7 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
                         'name' => 'Object 3',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 2,
-                    'per_page' => 2,
-                    'total' => 3,
-                    'last_page' => 2,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => null,
-                        'sort' => null,
-                    ],
-                ],
+                'meta' => $this->metaPayload(3, currentPage: 2, perPage: 2, lastPage: 2),
             ]);
     }
 
@@ -351,23 +299,36 @@ class ObjectIndexControllerTest extends CreateAuthorizationApiTestCase
                         'name' => 'Target Zebra',
                     ],
                 ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 2,
-                    'last_page' => 1,
-                    'filters' => [
-                        'scope_id' => null,
-                        'code' => null,
-                        'name' => 'Target',
-                        'sort' => 'code',
-                    ],
-                ],
+                'meta' => $this->metaPayload(2, [
+                    'name' => 'Target',
+                    'sort' => 'code',
+                ]),
             ]);
     }
 
     public function test_it_rejects_invalid_query_filters(): void
     {
         $this->assertIndexRejectsInvalidFilters('/api/objects');
+    }
+
+    private function metaPayload(
+        int $total,
+        array $filters = [],
+        int $currentPage = 1,
+        int $perPage = 20,
+        int $lastPage = 1,
+    ): array {
+        return [
+            'current_page' => $currentPage,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => $lastPage,
+            'filters' => array_merge([
+                'scope_id' => null,
+                'code' => null,
+                'name' => null,
+                'sort' => null,
+            ], $filters),
+        ];
     }
 }

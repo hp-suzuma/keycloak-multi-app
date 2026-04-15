@@ -1167,3 +1167,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/MeControllerTest.php` に `currentUserPayload()` と `assertNullCurrentUserResponse()` を追加し、`current_user` の同型 assertion を file 内 helper に寄せた。JWKS discovery や token 条件の前提は各 test に固有なので、その周辺ロジックはそのまま残した
 - 影響範囲: `tests/Feature/Api/MeControllerTest.php`、me controller test の current_user assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、unused import の再走査を続けつつ、`Me*` 系以外でも長い response assertion の中で shape だけが重複している 1 file 候補があれば小さく整える
+
+### Object index controller test の meta payload を file 内 helper に寄せる
+
+- 背景: `ObjectIndexControllerTest` は filter / pagination 系の確認が多く、`meta` の shape が 1 file 内で何度も繰り返されていた。response 全体を helper 化すると data 部分まで隠れてしまうが、`meta` だけなら共通形を寄せても各 test の意図を保ちやすかった
+- 決定事項: `tests/Feature/Api/ObjectIndexControllerTest.php` に `metaPayload()` を追加し、`current_page` / `per_page` / `total` / `last_page` / `filters` の共通 shape を file 内 helper に寄せた。data 配列は各 test の中心なのでそのまま残し、index 系の共通 helper へは広げない
+- 影響範囲: `tests/Feature/Api/ObjectIndexControllerTest.php`、object index test の meta assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、index 系の他 file でも `meta` の繰り返しが 1 file 内で目立つかを見つつ、広域共通化ではなく 1 file 単位で小さく整える
