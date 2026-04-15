@@ -999,3 +999,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` を追加し、`tests/Feature/Api` 配下の PHP file を走査して Bearer Authorization header の直書きを検知したら失敗するようにした。Bearer 付与は今後も `withAccessToken()` または `withBearerToken()` に統一し、helper 実装を持つ `tests/Concerns` 側は監視対象に含めない
 - 影響範囲: `tests/Feature/Api` 配下の Keycloak 認証つき request test、`tests/Concerns/InteractsWithKeycloakTokens.php` の利用方針、`ap-server/backend/README.md`
 - 次の推奨アクション: 今後 Bearer header を伴う API test を追加する場合は、まず既存 helper を使う。監視テストが落ちた場合は新しい helper を足す前に `withAccessToken()` と `withBearerToken()` のどちらで表現できるかを先に確認する
+
+### API feature test の Bearer header 監視は文字列補間の揺れも拾う
+
+- 背景: 初回の監視テストは `Bearer '.$token` のような連結パターンには効いていたが、`"Bearer $token"` や `"Bearer {$token}"` のような文字列補間まで含めると、同じ重複が別表記で再発しても取りこぼす余地があった
+- 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の検知パターンを広げ、`withHeader()` と `withHeaders()` の両方で Bearer header の連結・文字列補間を監視対象に含めた。今後は「Authorization header をその場で組み立てているか」を基準に helper 利用へ寄せる
+- 影響範囲: `tests/Feature/Api/BearerTokenHelperUsageTest.php` の失敗条件、`tests/Feature/Api` 配下での Bearer token 付与方法、`ap-server/backend/README.md`
+- 次の推奨アクション: 今後監視テストが落ちたときは、まず直書きを `withAccessToken()` か `withBearerToken()` へ置換する。もしそのどちらでも表現できない新しい Bearer 付与パターンが出た場合だけ、helper 側の責務拡張を README 更新とセットで検討する

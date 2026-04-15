@@ -15,8 +15,8 @@ class BearerTokenHelperUsageTest extends TestCase
         $violations = [];
 
         $patterns = [
-            '/withHeader\s*\(\s*[\'"]Authorization[\'"]\s*,\s*[\'"]Bearer\s*\./',
-            '/withHeaders\s*\(\s*\[[\s\S]*?[\'"]Authorization[\'"]\s*=>\s*[\'"]Bearer\s*\./',
+            '/withHeader\s*\(\s*[\'"]Authorization[\'"]\s*,\s*(?:[\'"]Bearer\s*\.[^,\)]*|\s*"Bearer\s+\$[A-Za-z_][A-Za-z0-9_]*"|\s*"Bearer\s+\{\$[A-Za-z_][A-Za-z0-9_]*\}")/',
+            '/withHeaders\s*\(\s*\[[\s\S]*?[\'"]Authorization[\'"]\s*=>\s*(?:[\'"]Bearer\s*\.[^\]\n]*|\s*"Bearer\s+\$[A-Za-z_][A-Za-z0-9_]*"|\s*"Bearer\s+\{\$[A-Za-z_][A-Za-z0-9_]*\}")/',
         ];
 
         $iterator = new RecursiveIteratorIterator(
@@ -58,7 +58,7 @@ class BearerTokenHelperUsageTest extends TestCase
         $this->assertSame(
             [],
             $violations,
-            "Feature API tests should use withAccessToken() or withBearerToken() instead of inlining Bearer Authorization headers.\nViolations:\n- ".implode("\n- ", $violations),
+            "Feature API tests should use withAccessToken() or withBearerToken() instead of inlining Bearer Authorization headers, including string interpolation forms.\nViolations:\n- ".implode("\n- ", $violations),
         );
     }
 }
