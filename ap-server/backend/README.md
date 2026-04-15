@@ -992,3 +992,10 @@ php artisan test
 - 決定事項: 現時点では、Bearer helper 以外に「挙動を変えない小さな共通化候補」は追加採用しない。`assertForbidden()` の共通 helper 化や permission payload 取得の trait 化は、抽象化の利得よりも各 test の意図が見えにくくなる懸念が大きいため見送る
 - 影響範囲: `tests/Feature/Api` 配下の test helper 方針、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 側を整える場合は、共通化よりも「新しい重複が追加されていないか」の監視に切り替え、同種の request header 構築や helper 直書きが再発した時だけ今回の helper を再利用して小さく閉じる
+
+### API feature test の Bearer header 重複は監視テストで再発検知する
+
+- 背景: Bearer helper 共通化テーマを完了したあとも、今後の test 追加時に `tests/Feature/Api` 配下へ `withHeader('Authorization', 'Bearer '.$token)` の直書きが戻ると、同じ整形作業が再発する。レビュー時の目視だけでは見逃す余地があるため、自動で検知できる軽い監視が必要だった
+- 決定事項: `tests/Feature/Api/BearerTokenHelperUsageTest.php` を追加し、`tests/Feature/Api` 配下の PHP file を走査して Bearer Authorization header の直書きを検知したら失敗するようにした。Bearer 付与は今後も `withAccessToken()` または `withBearerToken()` に統一し、helper 実装を持つ `tests/Concerns` 側は監視対象に含めない
+- 影響範囲: `tests/Feature/Api` 配下の Keycloak 認証つき request test、`tests/Concerns/InteractsWithKeycloakTokens.php` の利用方針、`ap-server/backend/README.md`
+- 次の推奨アクション: 今後 Bearer header を伴う API test を追加する場合は、まず既存 helper を使う。監視テストが落ちた場合は新しい helper を足す前に `withAccessToken()` と `withBearerToken()` のどちらで表現できるかを先に確認する
