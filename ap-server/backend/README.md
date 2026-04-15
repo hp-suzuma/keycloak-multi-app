@@ -1265,3 +1265,24 @@ php artisan test
 - 決定事項: `tests/Feature/Api/MeAuthorizationControllerTest.php` に `scopePayload()` と `rolePayload()` を追加し、assignment 内の固定 shape を file 内 helper に寄せた。authorization 全体や assignment 全体は test 意図の中心なので helper 化せず、そのまま残した
 - 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、me authorization test の response assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に backend test を整える場合は、authorization / middleware 系 file を見ながら、response 全体ではなく部分的な固定 shape だけが本文の見通しを下げている箇所を同じ粒度で小さく寄せる
+
+### Me authorization controller test の permission payload 配列だけを追加で helper に寄せる
+
+- 背景: 上の基準を引き継いで authorization / middleware 系 file を見直すと、`MeAuthorizationControllerTest` は `scope` / `role` を寄せた後も assignment 内の `permissions` 配列だけが複数行の固定 shape として残っていた。一方で `RequiredPermissionsMiddlewareTest` は 80 行台と短く、既存 helper のままで十分追いやすかったため、middleware 側は今回は触らない方が粒度を揃えやすかった
+- 決定事項: `tests/Feature/Api/MeAuthorizationControllerTest.php` に `permissionsPayload()` を追加し、assignment 内で繰り返す permission object 配列だけを file 内 helper に寄せた。authorization 全体の shape や top-level の `permissions` slug 一覧、`RequiredPermissionsMiddlewareTest` の response helper は現状維持にした
+- 影響範囲: `tests/Feature/Api/MeAuthorizationControllerTest.php`、`tests/Feature/Api/RequiredPermissionsMiddlewareTest.php` の helper 採用判断、authorization / middleware 系 response assertion の整理方針、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に authorization / middleware 系を整える場合も、短い file に新しい helper を足す前に、長めの file で固定 object 配列だけが本文を重くしている箇所があるかを先に見る
+
+### Me controller / middleware / shared auth helper は現状維持にする
+
+- 背景: 上の推奨アクションに沿って `MeControllerTest`、`RequiredPermissionsMiddlewareTest`、`tests/Concerns/InteractsWithKeycloakTokens.php` を見直した。`MeControllerTest` は `currentUserPayload()` と `assertNullCurrentUserResponse()` ですでに response shape のノイズが十分抑えられており、残っている繰り返しは JWT claims や JWKS fixture で、今回の「response 全体ではなく部分的な固定 shape」を寄せる基準から外れていた。`RequiredPermissionsMiddlewareTest` も file 自体が短く、shared concern 側の `buildJwk()` / `fakeJwks()` も response assertion ではなく test setup の責務として分かれていた
+- 決定事項: 今回は `MeControllerTest`、`RequiredPermissionsMiddlewareTest`、`tests/Concerns/InteractsWithKeycloakTokens.php` には helper を追加しない。authorization / middleware 系のこの小タスクはいったんここで止め、今後は新しい長めの file で response assertion 内の固定 object 配列が明確にノイズになっている場合だけ再開する
+- 影響範囲: `tests/Feature/Api/MeControllerTest.php`、`tests/Feature/Api/RequiredPermissionsMiddlewareTest.php`、`tests/Concerns/InteractsWithKeycloakTokens.php` の helper 採用判断、authorization / middleware 系 test 整理の継続条件、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、authorization / middleware 系からはいったん離れ、別の長めの test file で response assertion の固定 shape が本文の見通しを下げている箇所を探す
+
+### store 系 3 file は成功 response helper で横並びを揃える
+
+- 背景: authorization / middleware 系から離れて長めの file を見直したが、`ObjectUpdateControllerTest` や `MeControllerTest` はすでに必要な helper が揃っており、今回の基準で追加する余地が小さかった。一方で `PlaybookStoreControllerTest`、`PolicyStoreControllerTest`、`ChecklistStoreControllerTest` には、成功時の `data` object shape が各 file に 1 回ずつ直接残っていて、3 resource を横断すると同じ読み筋だけが素直に揃っていなかった
+- 決定事項: `tests/Feature/Api/PlaybookStoreControllerTest.php`、`tests/Feature/Api/PolicyStoreControllerTest.php`、`tests/Feature/Api/ChecklistStoreControllerTest.php` にそれぞれ `assertPlaybookResponse()` / `assertPolicyResponse()` / `assertChecklistResponse()` を追加し、成功 response の `id` / `scope_id` / `code` / `name` shape だけを helper に寄せた。duplicate validation helper と request payload helper は既存の役割のまま維持した
+- 影響範囲: 上記 3 file の success response assertion 記述、store 系 resource test の helper 粒度、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に backend test を整える場合は、resource ごとの store / update / show を横断して、同じ response item shape が 2 回以上出る小さな系列を優先して揃える

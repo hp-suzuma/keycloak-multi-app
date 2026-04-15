@@ -83,20 +83,18 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                         [
                             'scope' => $this->scopePayload($serverScope->id, 'server', 'srv-1', 'Server 1'),
                             'role' => $this->rolePayload($serverAdminRole->id, 'server_admin', 'Server Admin', 'server', 'admin'),
-                            'permissions' => [
-                                $this->permissionPayload('object.read'),
-                                $this->permissionPayload('object.update'),
-                                $this->permissionPayload('object.create'),
-                                $this->permissionPayload('object.delete'),
-                                $this->permissionPayload('object.execute'),
-                            ],
+                            'permissions' => $this->permissionsPayload(
+                                'object.read',
+                                'object.update',
+                                'object.create',
+                                'object.delete',
+                                'object.execute',
+                            ),
                         ],
                         [
                             'scope' => $this->scopePayload($tenantScope->id, 'tenant', 'tenant-a', 'Tenant A', $serverScope->id),
                             'role' => $this->rolePayload($tenantViewerRole->id, 'tenant_viewer', 'Tenant Viewer', 'tenant', 'viewer'),
-                            'permissions' => [
-                                $this->permissionPayload('object.read'),
-                            ],
+                            'permissions' => $this->permissionsPayload('object.read'),
                         ],
                     ],
                     'permissions' => [
@@ -145,6 +143,17 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
             'slug' => $permission->slug,
             'name' => $permission->name,
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, slug: string, name: string}>
+     */
+    private function permissionsPayload(string ...$slugs): array
+    {
+        return array_map(
+            fn (string $slug): array => $this->permissionPayload($slug),
+            $slugs,
+        );
     }
 
     private function scopePayload(

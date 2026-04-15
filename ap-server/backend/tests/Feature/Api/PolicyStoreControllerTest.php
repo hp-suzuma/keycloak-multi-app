@@ -20,16 +20,7 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'Tenant Policy',
             ));
 
-        $response
-            ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => 1,
-                    'scope_id' => $scope->id,
-                    'code' => 'tenant-policy',
-                    'name' => 'Tenant Policy',
-                ],
-            ]);
+        $this->assertPolicyResponse($response, 1, $scope->id, 'tenant-policy', 'Tenant Policy');
 
         $this->assertDatabaseHas('policies', [
             'scope_id' => $scope->id,
@@ -65,6 +56,20 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'message' => 'Validation failed',
                 'errors' => [
                     'code' => ['The code has already been taken within the target scope.'],
+                ],
+            ]);
+    }
+
+    private function assertPolicyResponse($response, int $policyId, int $scopeId, string $code, string $name): void
+    {
+        $response
+            ->assertCreated()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $policyId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }

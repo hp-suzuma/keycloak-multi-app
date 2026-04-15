@@ -27,16 +27,7 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'Tenant Playbook',
             ));
 
-        $response
-            ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => 1,
-                    'scope_id' => $tenantScope->id,
-                    'code' => 'tenant-playbook',
-                    'name' => 'Tenant Playbook',
-                ],
-            ]);
+        $this->assertPlaybookResponse($response, 1, $tenantScope->id, 'tenant-playbook', 'Tenant Playbook');
     }
 
     public function test_it_returns_validation_errors_when_scope_and_code_are_duplicated(): void
@@ -67,6 +58,20 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'message' => 'Validation failed',
                 'errors' => [
                     'code' => ['The code has already been taken within the target scope.'],
+                ],
+            ]);
+    }
+
+    private function assertPlaybookResponse($response, int $playbookId, int $scopeId, string $code, string $name): void
+    {
+        $response
+            ->assertCreated()
+            ->assertExactJson([
+                'data' => [
+                    'id' => $playbookId,
+                    'scope_id' => $scopeId,
+                    'code' => $code,
+                    'name' => $name,
                 ],
             ]);
     }
