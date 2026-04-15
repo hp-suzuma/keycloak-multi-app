@@ -54,6 +54,11 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'name' => 'Duplicated Policy',
             ]);
 
+        $this->assertDuplicateCodeValidationResponse($response);
+    }
+
+    private function assertDuplicateCodeValidationResponse($response): void
+    {
         $response
             ->assertUnprocessable()
             ->assertExactJson([

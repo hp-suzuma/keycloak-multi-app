@@ -1097,3 +1097,10 @@ php artisan test
 - 決定事項: `tests/Feature/Api/PlaybookStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。作成成功系の response は個別性が高いためそのまま残した
 - 影響範囲: `tests/Feature/Api/PlaybookStoreControllerTest.php`、playbook store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
+
+### Policy store controller test の重複 code validation assertion も file 内 helper に寄せる
+
+- 背景: `PolicyStoreControllerTest` を確認すると、`PlaybookStoreControllerTest` と同じく重複 code 時の固定 validation payload を直接書いていた。store 系 test では失敗ケースの assertion 形状が揃っているため、近い file 同士で helper 化の粒度を合わせると読み方をそろえやすかった
+- 決定事項: `tests/Feature/Api/PolicyStoreControllerTest.php` に `assertDuplicateCodeValidationResponse()` を追加し、重複 code 時の固定 validation assertion を file 内 helper へ寄せた。作成成功系の response と DB assertion は個別性が高いためそのまま残した
+- 影響範囲: `tests/Feature/Api/PolicyStoreControllerTest.php`、policy store test の duplicate validation assertion 記述、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に test 整理を進める場合は、今回と同じく 1 file に閉じるノイズ候補を選び、未使用 import、命名のずれ、assertion message の重複を優先して小さく整える
