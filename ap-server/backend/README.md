@@ -1663,3 +1663,24 @@ php artisan test
 - 決定事項: users 管理 UI の基本動線は drill-down とし、実際の一覧表示や操作対象の確定は選択済み scope を `scope_id` として `GET /api/users` に渡して行う。上位ユーザーは配下 scope を参照できるが、作成やメンテナンスの実操作は対象 scope を明示的に選んだ状態で進める前提とする
 - 影響範囲: `GET /api/users` の `scope_id` filter の位置づけ、frontend 側の service / tenant 選択導線、users 一覧画面の drill-down UX、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に進めるなら、frontend 側の画面遷移を前提に `GET /api/scopes` の `parent_scope_id` を使った drill-down 候補取得フローを具体化し、service 一覧から tenant 一覧へどう繋ぐかを決める
+
+### frontend の users 雛形では `scope_id + keyword + sort` だけを live query に使う
+
+- 背景: `ap-server/frontend` 側で users 一覧と詳細の最小フローを追加し、service -> tenant の drill-down、一覧検索、詳細表示までを先に具体化した。現段階では CurrentUser / Bearer token の受け口がまだ無く、roles/scopes 候補 API へ pagination や追加 search を先回りで足すより、画面で本当に使う query を固定するほうが次の接続作業へ繋げやすかった
+- 決定事項: frontend の一覧状態は `service_scope_id` / `tenant_scope_id` を持っても、backend へ送る live query は `GET /api/users` の `scope_id`, `keyword`, `sort` に限定する。`GET /api/scopes` は drill-down 候補取得のため `layer` と `parent_scope_id` だけを使い、roles/scopes 向けの追加 search や pagination は当面追加しない
+- 影響範囲: `GET /api/users`, `GET /api/scopes` の拡張優先順位、`ap-server/frontend/README.md` の users UI 前提、CurrentUser / token 受け口を追加する次工程、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は frontend 側で CurrentUser または Bearer token の受け口を 1 箇所に寄せ、`mock` から `live` へ切り替えても `GET /api/users`, `GET /api/users/{keycloakSub}`, `GET /api/scopes` を同じ画面で確認できるようにする
+
+### frontend の CurrentUser 取得口は `GET /api/me` を基準にする
+
+- 背景: frontend 側で auth 入口を 1 箇所に寄せる作業を進め、app shell から mode 切り替えと Bearer token 設定を扱えるようにした。これにより users 一覧 / 詳細がどちらも同じ token で live API を叩ける状態になり、CurrentUser の解決も backend 契約に沿って一本化できた
+- 決定事項: frontend は `GET /api/me` を CurrentUser の唯一の取得入口として扱い、users 系 API の live 呼び出しも同じ Bearer token を使う。backend 側では users 系 API 追加時も `GET /api/me` と矛盾しない CurrentUser 表現を維持する
+- 影響範囲: `GET /api/me` の継続運用、frontend の auth composable 前提、今後の assignment UI 実装時の token 受け渡し、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は frontend の users 詳細で assignment 追加 / 削除 UI を具体化し、その時点で `GET /api/roles` と `GET /api/scopes` に追加 filter が必要かを再評価する
+
+### dashboard のメニュー切り替えは `GET /api/me/authorization` の permissions を基準にする
+
+- 背景: frontend 側でログイン後ホーム、header / sidebar / footer を含む dashboard shell を追加し、ヘッダーやサイドバーのメニュー構成をログインユーザーごとに切り替える要件が入った。`GET /api/me` だけでは権限情報が足りないため、既存の `GET /api/me/authorization` を同じ auth 入口で併用する形にした
+- 決定事項: frontend では `GET /api/me` と `GET /api/me/authorization` を同じ Bearer token で取得し、dashboard sidebar のメニューは `authorization.permissions` と assignment の primary scope layer を基準に組み立てる。backend 側では dashboard メニュー制御に使う前提で `permissions` 集約の表現を維持する
+- 影響範囲: `GET /api/me/authorization` の継続運用、frontend dashboard shell、今後のメニュー追加時に必要な permission 粒度、`ap-server/backend/README.md`
+- 次の推奨アクション: 次は users 詳細の assignment 操作 UI を dashboard shell 上へ載せ、role / scope 候補 API で frontend が本当に必要とする filter 条件を確認する

@@ -5,6 +5,14 @@ export default defineNuxtConfig({
     '@nuxt/ui'
   ],
 
+  runtimeConfig: {
+    public: {
+      apApiBase: '',
+      apApiBearerToken: '',
+      apUserManagementMode: 'mock'
+    }
+  },
+
   devtools: {
     enabled: true
   },
