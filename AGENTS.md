@@ -44,3 +44,6 @@
 
 - `ap-server/backend` の API 方針や認証まわりの引継ぎは `ap-server/backend/README.md` に記録する
 - 今後 `ap-server/frontend` や他ディレクトリでも同様の判断が出た場合は、そのディレクトリの `README.md` に記録する
+- Ubuntu Server へ直接入れる開発基盤は `Node 22 + corepack + pnpm + Playwright` を基準にし、PHP / Composer / Laravel 実行系は引き続き Docker コンテナ側を正とする
+- Browser 実行環境の入口はルートの `e2e/README.md` とし、ブラウザ確認や派生プロジェクト向けの Node 系ツールはこの方針にそろえる
+- `bff-b` は現時点では削除せず、multi-app / route assignment の検証資産として保持する

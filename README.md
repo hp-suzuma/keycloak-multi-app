@@ -25,13 +25,54 @@ Keycloak を使った認証環境は維持しますが、優先順位は `認証
 - `https://b.example.com` : Tenant BFF B
 - `https://keycloak.example.com` : Keycloak
 - `https://pgadmin.example.com` : pgAdmin
+- `https://ap.example.com` : AP Frontend
+- `https://ap-backend-fpm.example.com` : AP Backend API
 
 サービス構成は [docker-compose.yml](/home/wsat/projects/keycloak-multi-app/docker-compose.yml) を参照してください。
+
+## 開発環境の基本方針
+
+今後の実開発や派生プロジェクト開発を見据えて、このリポジトリでは `Ubuntu 直の開発基盤 + Docker のアプリ実行基盤` を基本方針にします。
+
+- Ubuntu 直に置くもの
+  `git`, `Node 22`, `corepack`, `pnpm`, `Playwright`, `rg` などの開発ツール
+- Docker に残すもの
+  `PHP`, `Composer`, `Laravel`, `PostgreSQL`, `Keycloak`, `nginx` などのプロジェクト実行系
+
+この分け方により、ブラウザ自動確認や派生プロジェクトの開発速度は保ちつつ、壊れやすいランタイム依存はコンテナ側へ閉じ込められます。
+
+### Ubuntu Server 側の推奨 Browser 実行環境
+
+Browser 実行環境は `Playwright + Chromium` を第一候補にし、Ubuntu Server へ直接入れます。
+
+- Node は `.nvmrc` の `22` 系を基準にする
+- package manager は `pnpm` を推奨する
+- Browser E2E は [e2e/README.md](/home/wsat/projects/keycloak-multi-app/e2e/README.md) を起点にする
+
+最小セットアップ例:
+
+```bash
+cd /home/wsat/projects/keycloak-multi-app
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm --dir e2e install
+pnpm --dir e2e run install:browsers
+```
+
+### `bff-b` の扱い
+
+`bff-b` は現時点では削除しません。
+
+- 既存の multi-app / route assignment 検証資産としてまだ参照価値がある
+- nginx / hosts / Keycloak の検証構成が `b.example.com` を含む前提で組まれている
+- まずは「常時必要な主役サービスではない」と整理する段階で十分
+
+つまり、日常の AP 開発では主役ではありませんが、今は `削除` より `保持したまま必要時だけ見る` 方針にします。
 
 実装上の役割はおおむね次の通りです。
 
 - `frontend/`
-  Nuxt 3 の最小入口画面。現在はログインボタン中心です。
+  Nuxt 4 の最小入口画面。現在はログインボタン中心です。
 - `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`
   Keycloak ログイン開始と、所属先 BFF への振り分けを担当します。
 - `laravel-overlay/app/Http/Controllers/TenantAuthController.php`
