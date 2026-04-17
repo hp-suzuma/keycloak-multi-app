@@ -1,4 +1,5 @@
 import dns from 'node:dns/promises'
+import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import { request as httpsRequest } from 'node:https'
 
@@ -25,6 +26,11 @@ const requiredUrls = [
   'https://ap.example.com/',
   'https://global.example.com/login',
   'https://keycloak.example.com/realms/myapp/.well-known/openid-configuration'
+]
+
+const ubuntuSourceFiles = [
+  '/etc/apt/sources.list.d/ubuntu.sources',
+  '/etc/apt/sources.list'
 ]
 
 function checkNodeVersion() {
@@ -155,6 +161,46 @@ function logResult(label, result) {
   }
 }
 
+async function checkUbuntuAptSources() {
+  for (const file of ubuntuSourceFiles) {
+    try {
+      const content = await readFile(file, 'utf8')
+      const lines = content
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('URIs:') || line.startsWith('deb '))
+
+      if (lines.length === 0) {
+        continue
+      }
+
+      const hasHttpArchive = lines.some((line) => /http:\/\/(archive|security)\.ubuntu\.com\/ubuntu\/?/i.test(line))
+      if (hasHttpArchive) {
+        return {
+          ok: false,
+          message: `${file} still points Ubuntu apt sources to http. Switch archive/security URIs to https before running install:ubuntu-libs on a new server.`,
+          detail: lines.join(' | ')
+        }
+      }
+
+      const hasHttpsArchive = lines.some((line) => /https:\/\/(archive|security)\.ubuntu\.com\/ubuntu\/?/i.test(line))
+      if (hasHttpsArchive) {
+        return {
+          ok: true,
+          message: `${file} uses https for Ubuntu apt sources.`
+        }
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return {
+    ok: true,
+    message: 'Ubuntu apt source file was not found or does not define archive/security URIs here.'
+  }
+}
+
 const username = process.env.KEYCLOAK_USERNAME ?? 'alice'
 const password = process.env.KEYCLOAK_PASSWORD ?? 'password'
 const failures = []
@@ -179,6 +225,12 @@ for (const url of requiredUrls) {
   if (!urlCheck.ok) {
     failures.push(`http:${url}`)
   }
+}
+
+const aptSourceCheck = await checkUbuntuAptSources()
+logResult('apt ubuntu-sources', aptSourceCheck)
+if (!aptSourceCheck.ok) {
+  failures.push('apt:ubuntu-sources')
 }
 
 console.log(`[info] keycloak test user: ${username}`)

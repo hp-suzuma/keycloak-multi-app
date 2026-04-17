@@ -359,3 +359,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: Ubuntu 側の `/etc/apt/sources.list.d/ubuntu.sources` の `URIs` を `http://archive.ubuntu.com/ubuntu/` / `http://security.ubuntu.com/ubuntu/` から `https://...` へ変更したうえで library 導入を進めた。結果として、この実機では Ubuntu 直の `pnpm --dir e2e run test:sso` が pass し、container fallback なしでも AP Frontend の SSO recovery を確認できた
 - 影響範囲: Ubuntu Server の apt 運用、`install:ubuntu-libs` 実行前の network troubleshooting、今後の browser 実測の既定手順
 - 次の推奨アクション: 次は `test:sso:auto` を日常入口として維持しつつ、別の Ubuntu Server を立てる時も apt source を最初から `https` に寄せるか確認する
+
+### `doctor` でも apt source の `http/https` を先に見る
+
+- 背景: apt source の `http` 問題は `install:ubuntu-libs` 実行まで見えず、browser 実測より前の段で時間を使いやすかった
+- 決定事項: `e2e/scripts/doctor.mjs` でも `/etc/apt/sources.list.d/ubuntu.sources` と `/etc/apt/sources.list` を見て、`archive.ubuntu.com` / `security.ubuntu.com` が `http` のままなら warning 相当ではなく失敗として返すようにした
+- 影響範囲: 新しい Ubuntu Server での初回 browser セットアップ、`doctor -> install:ubuntu-libs` の順序、apt network troubleshooting の開始地点
+- 次の推奨アクション: 次は別の Ubuntu Server でも `pnpm --dir e2e run doctor` を最初に流し、apt source が `http` のままなら `https` へ直してから library 導入に進む

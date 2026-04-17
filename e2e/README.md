@@ -59,6 +59,7 @@ pnpm --dir e2e run wait:stack
 - `ap.example.com`, `global.example.com/login`, `keycloak` OIDC discovery の疎通
 - Playwright 実行時に使う Keycloak 資格情報の参照元
 - `PLAYWRIGHT_HOST_MAP` を使った host mapping の有無
+- Ubuntu apt source が `archive.ubuntu.com` / `security.ubuntu.com` を `https` で向いているか
 
 `wait:stack` は Docker stack の起動直後に使う想定で、必要 URL が応答するまで待ちます。
 
