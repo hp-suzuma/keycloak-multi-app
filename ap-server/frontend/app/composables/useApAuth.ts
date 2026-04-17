@@ -1,4 +1,5 @@
 import { describeApApiError } from '~/utils/apApiError'
+import { useApSso } from '~/composables/useApSso'
 
 export interface ApCurrentUser {
   id: string | number
@@ -57,7 +58,7 @@ interface MeAuthorizationResponse {
 
 function withAuthorizationHeaders(token: string) {
   return {
-    Authorization: `Bearer ${token}`,
+    'Authorization': `Bearer ${token}`,
     'X-Forwarded-Authorization': `Bearer ${token}`
   }
 }
@@ -70,6 +71,7 @@ function withAuthorizationQuery(token: string) {
 
 type AuthMode = 'mock' | 'live'
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error'
+type AuthRecoveryKind = 'none' | 'setup' | 'refresh' | 'retry'
 
 const MOCK_CURRENT_USER: ApCurrentUser = {
   id: 'mock-admin-1',
@@ -146,6 +148,7 @@ const TOKEN_STORAGE_KEY = 'ap-api-bearer-token'
 
 export function useApAuth() {
   const config = useRuntimeConfig()
+  const { globalLoginUrl: buildGlobalLoginUrl } = useApSso()
   const modeOverride = useState<AuthMode | null>('ap-auth-mode-override', () => null)
   const tokenOverride = useState<string>('ap-auth-token-override', () => '')
   const currentUser = useState<ApCurrentUser | null>('ap-auth-current-user', () => null)
@@ -164,9 +167,44 @@ export function useApAuth() {
 
   const apiBase = computed(() => config.public.apApiBase)
   const bearerToken = computed(() => tokenOverride.value || config.public.apApiBearerToken)
+  const globalLoginUrl = computed(() => buildGlobalLoginUrl())
   const hasBearerToken = computed(() => bearerToken.value.length > 0)
   const isLiveReady = computed(() => mode.value === 'live' && apiBase.value.length > 0 && hasBearerToken.value)
   const effectivePermissions = computed(() => authorization.value?.permissions ?? [])
+  const liveSessionLooksExpired = computed(() =>
+    mode.value === 'live'
+    && hasBearerToken.value
+    && status.value === 'ready'
+    && !currentUser.value
+    && !authorization.value
+  )
+  const needsAuthRecovery = computed(() =>
+    mode.value === 'live'
+    && (
+      !hasBearerToken.value
+      || status.value === 'error'
+      || liveSessionLooksExpired.value
+    )
+  )
+  const authRecoveryKind = computed<AuthRecoveryKind>(() => {
+    if (mode.value !== 'live') {
+      return 'none'
+    }
+
+    if (!hasBearerToken.value) {
+      return 'setup'
+    }
+
+    if (liveSessionLooksExpired.value) {
+      return 'refresh'
+    }
+
+    if (status.value === 'error') {
+      return 'retry'
+    }
+
+    return 'none'
+  })
 
   function persistClientState() {
     if (!import.meta.client) {
@@ -275,6 +313,7 @@ export function useApAuth() {
     mode,
     apiBase,
     bearerToken,
+    globalLoginUrl,
     currentUser,
     authorization,
     effectivePermissions,
@@ -282,6 +321,9 @@ export function useApAuth() {
     errorMessage,
     hasBearerToken,
     isLiveReady,
+    liveSessionLooksExpired,
+    needsAuthRecovery,
+    authRecoveryKind,
     setMode,
     setBearerToken,
     refreshCurrentUser

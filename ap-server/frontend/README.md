@@ -275,3 +275,38 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: 失効済み token で `GET /api/me` と `GET /api/me/authorization` を叩くと、どちらも `200` で `current_user: null` / `authorization: null` を返す。一方、`GET /api/users*` は `403 Forbidden` を返す。これに合わせて `AppAuthPanel` では「Auth Entry 上は `403` ではなく `null` として見えることがある」案内を追加し、users 一覧 / 詳細の `403` 文言とは切り分けて扱う
 - 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、期限切れ token 時の live mode UX、Auth Entry と users 画面のエラー理解、今後の再認証導線検討
 - 次の推奨アクション: 次に進めるなら、実運用向けの auth UX を詰める保留議題へ戻り、`401/403/null current_user` を silent login / token refresh / SSO へ戻す導線のどれで吸収するかを決める
+
+### 暫定 auth UX では Auth Entry を再認証ハブに統一する
+
+- 背景: live mode の auth 失敗は `401` / `403` / `current_user: null` に分かれて見えるため、users 一覧や詳細で個別に説明すると「どこへ戻れば復旧できるか」が画面ごとにぶれやすかった。一方、この段階では silent login や refresh token、SSO redirect の本実装はまだ無く、既存 UI で確実に吸収できる導線を先に揃える必要があった
+- 決定事項: 当面は `AppAuthPanel` を再認証ハブとして扱い、live mode で Bearer token 未設定・`current_user: null`・API error のいずれでも「まず Auth Entry で fresh token を更新してから users 画面へ戻る」導線を共通表示する。silent login / token refresh / SSO redirect の選定は保留し、users 一覧 / 詳細には `/#auth-entry` へ戻す CTA を置く
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、live mode の再認証オペレーション、今後の本実装 auth 導線差し替え
+- 次の推奨アクション: 次は Keycloak / Nuxt 間で silent login、refresh token、SSO redirect のどれを正式採用するかを決め、暫定の Auth Entry 導線を本番向け session recovery に置き換える
+
+### ap-frontend 検証コンテナは Node 22 系を基準にする
+
+- 背景: `ap-frontend` コンテナ内で `npm run lint` を回したところ、ESLint 10 系が依存経由で使う `Object.groupBy` を Node 20.20.2 が持たず、frontend の差分確認前に `TypeError: Object.groupBy is not a function` で停止した。検証を継続的に回すには、repo 側で container runtime を先に揃える必要があった
+- 決定事項: `docker/ap-frontend/Dockerfile` の base image を `node:22-alpine` に上げ、`ap-server/frontend` の lint / typecheck は Node 22 系の `ap-frontend` コンテナを基準に実行する
+- 影響範囲: `docker/ap-frontend/Dockerfile`、`docker compose up -d --build ap-frontend` 後の frontend 検証手順、今後の ESLint / Nuxt 更新時の runtime 前提
+- 次の推奨アクション: 次は `ap-frontend` を rebuild して `npm run lint` と `npm run typecheck` を回し、Node 22 前提で frontend 検証が安定して通ることを確認する
+
+### 実運用向け session recovery は `global.example.com/login` へ戻す SSO redirect を正式採用する
+
+- 背景: 保留していた比較候補を見直すと、現行の AP Frontend は refresh token を保持せず、AP 専用の silent login callback もまだ持っていない。この状態で silent login や token refresh を frontend 単体へ先行実装すると、BFF / Keycloak との責務分離が崩れやすかった
+- 決定事項: 実運用向け session recovery は `https://global.example.com/login` へ戻す SSO redirect を正式採用する。`Auth Entry` の Bearer token 入力は live debug 専用と位置づけ、users 一覧 / 詳細 / dashboard header の recovery CTA は SSO Login を主導線、`/#auth-entry` は debug 用補助導線として扱う
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`ap-server/frontend/app/utils/apApiError.ts`、`ap-server/frontend/nuxt.config.ts`、今後の AP 向け BFF 追加判断
+- 次の推奨アクション: 次は AP Frontend 自身が SSO 完了後に自然復帰できるよう、`ap.example.com` 側の callback / session bridge をどこへ置くかを決め、`global.example.com/login` から AP へ戻る正式経路を追加する
+
+### frontend の lint warning は早めに auto-fix で解消していく
+
+- 背景: Node 22 化後に `ap-frontend` コンテナで lint を正常実行できるようになった結果、既存の `vue/max-attributes-per-line` と `vue/attributes-order` 由来の warning が大量に見えるようになった。この状態を残すと、今後の実装差分で本当に見たい lint signal が warning 群に埋もれやすい
+- 決定事項: `ap-server/frontend` では lint warning を将来まとめて片づけるのではなく、見つかった段階で `eslint --fix` を使って早めに解消する。今回も `ap-frontend` コンテナ内で auto-fix を適用し、template 属性改行や順序の整形を repo の lint ルールへ合わせた
+- 影響範囲: `ap-server/frontend/app/components/dashboard/*`、`app/pages/index.vue`、`app/pages/users/*` を含む template formatting、`docker/ap-frontend/Dockerfile` を使った lint 運用、今後の frontend 差分レビューのノイズ量
+- 次の推奨アクション: 次は AP Frontend の callback / session bridge を進める実装でも、作業の最後に `docker compose exec ap-frontend npm run lint` と `npm run typecheck` を回し、warning を再び溜めない運用を続ける
+
+### AP Frontend の SSO 復帰は `global login -> /auth/bridge -> /auth/callback` でつなぐ
+
+- 背景: 実運用向け session recovery を `global.example.com/login` に寄せても、そのままでは AP Frontend 側に SSO 完了後の token 受け口が無く、ログイン後に `ap.example.com` へ自然復帰できなかった。tenant BFF と同じ server-side session をそのまま持ち込むより、AP Frontend 専用の Bearer token を browser 側で受け取り直す薄い bridge を置く方が責務分離に合っていた
+- 決定事項: Global BFF の `/login` は `return_to` を受け付け、AP Frontend の `SSO Login` は `https://global.example.com/login?return_to=https://ap.example.com/auth/bridge?...` を使う。`/auth/bridge` では Keycloak SSO session を使って `prompt=none + PKCE` の認可コードフローを開始し、`/auth/callback` で `ap-frontend` public client の access token を受け取って `useApAuth()` の Bearer token と live mode へ反映する
+- 影響範囲: `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`keycloak/realm-myapp.json`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/pages/auth/bridge.vue`、`ap-server/frontend/app/pages/auth/callback.vue`、既存の `SSO Login` CTA、Keycloak realm 再読込手順、今後の AP 向け logout / callback 拡張
+- 次の推奨アクション: 次は `docker compose up -d --force-recreate keycloak bff-global ap-frontend nginx` で realm と Global BFF を反映し、`https://ap.example.com` の `SSO Login` から users 一覧 / 詳細へ元の path・query を保ったまま自然復帰できるかを live で通し確認する

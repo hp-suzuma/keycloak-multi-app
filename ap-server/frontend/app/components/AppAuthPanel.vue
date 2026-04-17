@@ -3,12 +3,15 @@ const {
   mode,
   apiBase,
   bearerToken,
+  globalLoginUrl,
   currentUser,
   authorization,
   status,
   errorMessage,
   hasBearerToken,
   isLiveReady,
+  liveSessionLooksExpired,
+  authRecoveryKind,
   setMode,
   setBearerToken,
   refreshCurrentUser
@@ -19,13 +22,55 @@ const tokenDraft = ref('')
 const isSubmitting = ref(false)
 const isRecommendedApiBase = computed(() => apiBase.value === RECOMMENDED_AP_API_BASE)
 const hasUserManagePermission = computed(() => authorization.value?.permissions.includes('user.manage') ?? false)
-const liveTokenLooksInvalid = computed(() =>
-  mode.value === 'live'
-  && hasBearerToken.value
-  && status.value === 'ready'
-  && !currentUser.value
-  && !authorization.value
-)
+const authRecoveryTitle = computed(() => {
+  if (authRecoveryKind.value === 'setup') {
+    return 'Session Setup'
+  }
+
+  if (authRecoveryKind.value === 'refresh') {
+    return 'Re-auth Required'
+  }
+
+  if (authRecoveryKind.value === 'retry') {
+    return 'API Retry'
+  }
+
+  return 'Auth Status'
+})
+const authRecoveryBody = computed(() => {
+  if (authRecoveryKind.value === 'setup') {
+    return '実運用の session recovery は `global.example.com/login` へ戻す方針です。Auth Entry の Bearer token 入力は live debug 用として残しています。'
+  }
+
+  if (authRecoveryKind.value === 'refresh') {
+    return '`GET /api/me` と `/api/me/authorization` は成功しましたが、どちらも `current_user: null` でした。実運用では SSO Login へ戻し、debug 時だけ fresh token へ入れ替えて再確認します。'
+  }
+
+  if (authRecoveryKind.value === 'retry') {
+    return errorMessage.value ?? 'live API への再取得が必要です。実運用では SSO Login へ戻し、debug 時だけ API Base と token を確認して再試行してください。'
+  }
+
+  return 'Auth Entry で live session を確認できます。'
+})
+const authRecoverySteps = computed(() => {
+  if (authRecoveryKind.value === 'setup') {
+    return [
+      '1. 実運用では `SSO Login` から global login へ戻る',
+      '2. live debug が必要な時だけ Bearer token を貼って `Apply & Refresh` を押す',
+      '3. `Current User` と `permissions` が埋まることを確認する'
+    ]
+  }
+
+  if (authRecoveryKind.value === 'refresh' || authRecoveryKind.value === 'retry') {
+    return [
+      '1. 実運用では `SSO Login` から global login へ戻る',
+      '2. live debug が必要な時だけ fresh token を取り直して `Apply & Refresh` を押す',
+      '3. `Current User` が復帰したあと users 画面へ戻る'
+    ]
+  }
+
+  return []
+})
 const scopeLabelById = computed(() => {
   const labels = new Map<number, string>()
 
@@ -75,7 +120,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <UCard class="border-primary/20 bg-white/80 shadow-lg shadow-cyan-950/5 backdrop-blur dark:bg-stone-900/70">
+  <UCard
+    id="auth-entry"
+    class="border-primary/20 bg-white/80 shadow-lg shadow-cyan-950/5 backdrop-blur dark:bg-stone-900/70"
+  >
     <template #header>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -161,6 +209,19 @@ onMounted(async () => {
           <p class="mt-2 text-xs leading-5 text-muted">
             live 検証で使っている Keycloak token は 5 分程度で期限切れになります。users 一覧 / 詳細 / assignment 操作を続けて確認する時は、先に token を更新しておくと切り分けがぶれません。
           </p>
+          <div
+            v-if="mode === 'live'"
+            class="mt-4"
+          >
+            <UButton
+              :to="globalLoginUrl"
+              color="primary"
+              variant="soft"
+              trailing-icon="i-lucide-log-in"
+            >
+              SSO Login
+            </UButton>
+          </div>
         </div>
 
         <div class="rounded-2xl border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40">
@@ -179,18 +240,32 @@ onMounted(async () => {
         </div>
 
         <div
-          v-if="liveTokenLooksInvalid"
+          v-if="mode === 'live' && authRecoveryKind !== 'none'"
           class="rounded-2xl border border-warning/30 bg-warning/10 p-4 dark:border-warning/20"
         >
           <p class="text-xs uppercase tracking-[0.18em] text-muted">
-            Token Check
+            {{ authRecoveryTitle }}
           </p>
           <p class="mt-2 text-sm text-toned">
-            `GET /api/me` と `/api/me/authorization` は成功しましたが、どちらも `current_user: null` でした。
+            {{ authRecoveryBody }}
           </p>
-          <p class="mt-2 text-xs text-muted">
-            live mode では、期限切れまたは無効な Bearer token でも Auth Entry 上は `403` ではなく `null` として見えることがあります。fresh token を取り直して `Refresh Only` で再確認してください。
+          <p
+            v-if="liveSessionLooksExpired"
+            class="mt-2 text-xs text-muted"
+          >
+            live mode では、期限切れまたは無効な Bearer token でも Auth Entry 上は `403` ではなく `null` として見えることがあります。
           </p>
+          <ul
+            v-if="authRecoverySteps.length"
+            class="mt-3 space-y-1 text-xs text-muted"
+          >
+            <li
+              v-for="step in authRecoverySteps"
+              :key="step"
+            >
+              {{ step }}
+            </li>
+          </ul>
         </div>
 
         <div class="rounded-2xl border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40">
@@ -203,12 +278,18 @@ onMounted(async () => {
                 menu 切り替えは従来どおり `permissions` を使い、ここでは direct grant と descendant access の根拠だけを補助表示します。
               </p>
             </div>
-            <UBadge color="neutral" variant="soft">
+            <UBadge
+              color="neutral"
+              variant="soft"
+            >
               {{ permissionScopeEntries.length }} permissions
             </UBadge>
           </div>
 
-          <div v-if="permissionScopeEntries.length" class="mt-4 space-y-3">
+          <div
+            v-if="permissionScopeEntries.length"
+            class="mt-4 space-y-3"
+          >
             <div
               v-for="entry in permissionScopeEntries"
               :key="entry.permission"
@@ -219,10 +300,16 @@ onMounted(async () => {
                   {{ entry.permission }}
                 </p>
                 <div class="flex flex-wrap gap-2">
-                  <UBadge color="neutral" variant="soft">
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                  >
                     direct {{ entry.grantedScopeIds.length }}
                   </UBadge>
-                  <UBadge color="primary" variant="soft">
+                  <UBadge
+                    color="primary"
+                    variant="soft"
+                  >
                     accessible {{ entry.accessibleScopeIds.length }}
                   </UBadge>
                 </div>
@@ -244,7 +331,10 @@ onMounted(async () => {
             </div>
           </div>
 
-          <p v-else class="mt-3 text-sm text-muted">
+          <p
+            v-else
+            class="mt-3 text-sm text-muted"
+          >
             `/api/me/authorization` で permission_scopes が返ると、ここに direct grant と accessible scope の差分を表示します。
           </p>
         </div>
@@ -261,12 +351,18 @@ onMounted(async () => {
           </ul>
         </div>
 
-        <p v-if="errorMessage" class="text-sm text-error">
+        <p
+          v-if="errorMessage"
+          class="text-sm text-error"
+        >
           {{ errorMessage }}
         </p>
       </div>
 
-      <form class="space-y-3 rounded-[1.5rem] border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40" @submit.prevent="applySettings">
+      <form
+        class="space-y-3 rounded-[1.5rem] border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40"
+        @submit.prevent="applySettings"
+      >
         <label class="block space-y-2">
           <span class="text-sm font-medium text-highlighted">Bearer Token Override</span>
           <textarea
@@ -278,7 +374,11 @@ onMounted(async () => {
         </label>
 
         <div class="flex flex-wrap items-center gap-2">
-          <UButton type="submit" color="primary" :loading="isSubmitting || status === 'loading'">
+          <UButton
+            type="submit"
+            color="primary"
+            :loading="isSubmitting || status === 'loading'"
+          >
             Apply & Refresh
           </UButton>
           <UButton

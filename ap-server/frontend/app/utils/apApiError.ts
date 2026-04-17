@@ -18,11 +18,11 @@ export function describeApApiError(cause: unknown, fallback: string): string {
     : undefined
 
   if (status === 403) {
-    return '403 Forbidden です。Bearer token の期限切れか権限不足の可能性があります。fresh token を取り直して Auth Entry で再取得してください。'
+    return '403 Forbidden です。期限切れ token か権限不足の可能性があります。実運用では SSO Login へ戻り、debug 時は Auth Entry で fresh token を再設定してください。'
   }
 
   if (status === 401) {
-    return '401 Unauthorized です。Bearer token を取り直して Auth Entry で再取得してください。'
+    return '401 Unauthorized です。実運用では SSO Login へ戻り、debug 時は Auth Entry で Bearer token を再設定してください。'
   }
 
   if (error.message?.includes('Failed to fetch')) {

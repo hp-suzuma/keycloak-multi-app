@@ -9,7 +9,7 @@ definePageMeta({
 
 const route = useRoute()
 const keycloakSub = computed(() => String(route.params.keycloakSub))
-const { mode, currentUser, authorization } = useApAuth()
+const { mode, currentUser, authorization, needsAuthRecovery, authRecoveryKind, globalLoginUrl } = useApAuth()
 const { getUser, listScopes, listRoles, addUserAssignment, deleteUserAssignment } = useApUserManagement()
 
 const serviceScopeId = computed(() => {
@@ -99,7 +99,7 @@ const scopeSearchKeyword = ref('')
 const roleSearchKeyword = ref('')
 const selectedPermissionRole = ref<PermissionRole | 'all'>('all')
 const selectedRoleSort = ref<'name' | 'slug' | 'permission_role'>('name')
-const feedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null)
+const feedback = ref<{ tone: 'success' | 'error', message: string } | null>(null)
 const isSubmitting = ref(false)
 const deletingAssignmentId = ref<number | null>(null)
 const pendingRemovalAssignment = ref<UserAssignmentItem | null>(null)
@@ -141,6 +141,21 @@ const selectedRoleUserManageAccess = computed(() =>
 const pendingRemovalUserManageAccess = computed(() =>
   resolvePermissionAccessStatus(authorization.value, 'user.manage', pendingRemovalAssignment.value?.scope.id)
 )
+const authRecoveryMessage = computed(() => {
+  if (authRecoveryKind.value === 'setup') {
+    return 'users 詳細の本番向け復旧導線は `global.example.com/login` です。Auth Entry の token 設定は live debug 用としてだけ使います。'
+  }
+
+  if (authRecoveryKind.value === 'refresh') {
+    return '期限切れ token では Auth Entry が `null current_user`、assignment 系 API が `403` になりやすいため、まず SSO Login へ戻します。live debug を続ける時だけ fresh token を入れ直してください。'
+  }
+
+  if (authRecoveryKind.value === 'retry') {
+    return 'assignment 追加 / 削除や詳細再取得で `401/403` が続く時は、実運用では SSO Login へ戻します。live debug の切り分けでは Auth Entry で token と API Base を確認してください。'
+  }
+
+  return null
+})
 
 const filteredAssignmentScopeOptions = computed(() => {
   const keyword = scopeSearchKeyword.value.trim().toLowerCase()
@@ -338,31 +353,56 @@ async function removeAssignment() {
       </div>
 
       <div class="flex items-center gap-3">
-        <UBadge v-if="currentUser" color="neutral" variant="soft">
+        <UBadge
+          v-if="currentUser"
+          color="neutral"
+          variant="soft"
+        >
           viewer: {{ currentUser.name }}
         </UBadge>
-        <UBadge :color="mode === 'live' ? 'success' : 'warning'" variant="soft">
+        <UBadge
+          :color="mode === 'live' ? 'success' : 'warning'"
+          variant="soft"
+        >
           {{ mode === 'live' ? 'LIVE API' : 'MOCK DATA' }}
         </UBadge>
-        <UButton to="/users" :query="backQuery" color="neutral" variant="soft" leading-icon="i-lucide-arrow-left">
+        <UButton
+          to="/users"
+          :query="backQuery"
+          color="neutral"
+          variant="soft"
+          leading-icon="i-lucide-arrow-left"
+        >
           一覧へ戻る
         </UButton>
       </div>
     </div>
 
-    <div v-if="status === 'pending'" class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-muted dark:bg-stone-900/70">
+    <div
+      v-if="status === 'pending'"
+      class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-muted dark:bg-stone-900/70"
+    >
       users 詳細を読み込み中です。
     </div>
 
-    <div v-else-if="error || !user" class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-error dark:bg-stone-900/70">
+    <div
+      v-else-if="error || !user"
+      class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-error dark:bg-stone-900/70"
+    >
       {{ detailErrorMessage ?? 'users 詳細の取得に失敗しました。' }}
     </div>
 
     <template v-else>
-      <UCard v-if="mode === 'live'" class="rounded-[2rem] border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20">
+      <UCard
+        v-if="mode === 'live'"
+        class="rounded-[2rem] border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20"
+      >
         <template #header>
           <div class="flex items-center gap-2 text-sm font-semibold">
-            <UIcon name="i-lucide-badge-alert" class="text-amber-600" />
+            <UIcon
+              name="i-lucide-badge-alert"
+              class="text-amber-600"
+            />
             Live Check
           </div>
         </template>
@@ -373,6 +413,35 @@ async function removeAssignment() {
         <p class="mt-2 text-xs leading-5 text-muted">
           正常系では viewer が `Alice A` で、assignment 追加は `201`、重複追加は `422`、削除は `204` になります。
         </p>
+        <div
+          v-if="needsAuthRecovery && authRecoveryMessage"
+          class="mt-4 rounded-2xl border border-amber-300/70 bg-white/70 p-4 dark:bg-stone-950/30"
+        >
+          <p class="text-sm font-semibold text-highlighted">
+            Re-auth Flow
+          </p>
+          <p class="mt-2 text-sm text-toned">
+            {{ authRecoveryMessage }}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              :to="globalLoginUrl"
+              color="primary"
+              variant="soft"
+              trailing-icon="i-lucide-log-in"
+            >
+              SSO Login
+            </UButton>
+            <UButton
+              to="/#auth-entry"
+              color="neutral"
+              variant="soft"
+              trailing-icon="i-lucide-arrow-up-right"
+            >
+              Auth Entry Debug
+            </UButton>
+          </div>
+        </div>
       </UCard>
 
       <section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,380px)]">
@@ -387,7 +456,10 @@ async function removeAssignment() {
                   backend: `GET /api/users/{keycloak_sub}`
                 </p>
               </div>
-              <UIcon name="i-lucide-id-card" class="text-2xl text-primary" />
+              <UIcon
+                name="i-lucide-id-card"
+                class="text-2xl text-primary"
+              />
             </div>
           </template>
 
@@ -432,7 +504,10 @@ async function removeAssignment() {
                   assignment 集約結果
                 </p>
               </div>
-              <UIcon name="i-lucide-key-round" class="text-2xl text-primary" />
+              <UIcon
+                name="i-lucide-key-round"
+                class="text-2xl text-primary"
+              />
             </div>
           </template>
 
@@ -461,7 +536,10 @@ async function removeAssignment() {
                 single-assignment API を使って追加 / 削除します。
               </p>
             </div>
-            <UIcon name="i-lucide-shield-check" class="text-2xl text-primary" />
+            <UIcon
+              name="i-lucide-shield-check"
+              class="text-2xl text-primary"
+            />
           </div>
         </template>
 
@@ -487,15 +565,25 @@ async function removeAssignment() {
                 class="w-full rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-950"
                 :disabled="filteredAssignmentScopeOptions.length === 0 || servicesStatus === 'pending' || tenantsStatus === 'pending'"
               >
-                <option v-for="scope in filteredAssignmentScopeOptions" :key="scope.id" :value="scope.id">
+                <option
+                  v-for="scope in filteredAssignmentScopeOptions"
+                  :key="scope.id"
+                  :value="scope.id"
+                >
                   {{ scope.name }} ({{ scope.layer }})
                 </option>
               </select>
               <p class="text-xs text-muted">
                 {{ selectedAssignmentScope ? `${selectedAssignmentScope.code} / ${selectedAssignmentScope.layer}` : 'filter 条件に一致する scope がありません。' }}
               </p>
-              <div v-if="selectedAssignmentScope" class="flex flex-wrap items-center gap-2">
-                <UBadge :color="userManageAccess.tone" variant="soft">
+              <div
+                v-if="selectedAssignmentScope"
+                class="flex flex-wrap items-center gap-2"
+              >
+                <UBadge
+                  :color="userManageAccess.tone"
+                  variant="soft"
+                >
                   user.manage: {{ userManageAccess.label }}
                 </UBadge>
                 <p class="text-xs text-muted">
@@ -515,7 +603,11 @@ async function removeAssignment() {
                   v-model="selectedPermissionRole"
                   class="rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                 >
-                  <option v-for="option in permissionRoleOptions" :key="option.value" :value="option.value">
+                  <option
+                    v-for="option in permissionRoleOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
                     {{ option.label }}
                   </option>
                 </select>
@@ -523,7 +615,11 @@ async function removeAssignment() {
                   v-model="selectedRoleSort"
                   class="rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                 >
-                  <option v-for="option in roleSortOptions" :key="option.value" :value="option.value">
+                  <option
+                    v-for="option in roleSortOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
                     Sort: {{ option.label }}
                   </option>
                 </select>
@@ -539,7 +635,11 @@ async function removeAssignment() {
                 class="w-full rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-950"
                 :disabled="!selectedAssignmentScope || filteredAvailableRoles.length === 0 || rolesStatus === 'pending'"
               >
-                <option v-for="role in filteredAvailableRoles" :key="role.id" :value="role.id">
+                <option
+                  v-for="role in filteredAvailableRoles"
+                  :key="role.id"
+                  :value="role.id"
+                >
                   {{ role.name }} ({{ role.slug }})
                 </option>
               </select>
@@ -569,15 +669,26 @@ async function removeAssignment() {
                   <p class="mt-2 text-sm font-semibold text-highlighted">
                     {{ selectedRole ? selectedRole.name : 'role を選ぶと summary を表示します。' }}
                   </p>
-                  <p v-if="selectedRole" class="text-xs text-toned">
+                  <p
+                    v-if="selectedRole"
+                    class="text-xs text-toned"
+                  >
                     {{ selectedRole.slug }} / {{ formatPermissionRoleLabel(selectedRole.permission_role) }}
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <UBadge v-if="selectedRole" color="neutral" variant="soft">
+                  <UBadge
+                    v-if="selectedRole"
+                    color="neutral"
+                    variant="soft"
+                  >
                     {{ formatPermissionRoleLabel(selectedRole.permission_role) }}
                   </UBadge>
-                  <UBadge v-if="selectedRole" color="neutral" variant="soft">
+                  <UBadge
+                    v-if="selectedRole"
+                    color="neutral"
+                    variant="soft"
+                  >
                     {{ selectedRole.permissions.length }} permissions
                   </UBadge>
                   <UBadge
@@ -590,7 +701,10 @@ async function removeAssignment() {
                 </div>
               </div>
 
-              <div v-if="selectedRole" class="mt-3 flex flex-wrap gap-2">
+              <div
+                v-if="selectedRole"
+                class="mt-3 flex flex-wrap gap-2"
+              >
                 <UBadge
                   v-for="permission in selectedRole.permissions"
                   :key="permission.id"
@@ -601,7 +715,10 @@ async function removeAssignment() {
                 </UBadge>
               </div>
 
-              <p v-if="selectedRole && selectedAssignmentScope" class="mt-3 text-xs text-muted">
+              <p
+                v-if="selectedRole && selectedAssignmentScope"
+                class="mt-3 text-xs text-muted"
+              >
                 この role を
                 <span class="font-semibold text-toned">{{ selectedAssignmentScope.name }}</span>
                 へ付与する操作は、
@@ -612,10 +729,18 @@ async function removeAssignment() {
           </section>
 
           <div class="flex flex-wrap gap-2 text-xs text-muted">
-            <UBadge v-if="selectedService" color="neutral" variant="soft">
+            <UBadge
+              v-if="selectedService"
+              color="neutral"
+              variant="soft"
+            >
               service: {{ selectedService.name }}
             </UBadge>
-            <UBadge v-if="tenantScopeId" color="primary" variant="soft">
+            <UBadge
+              v-if="tenantScopeId"
+              color="primary"
+              variant="soft"
+            >
               tenant drill-down active
             </UBadge>
             <span v-if="servicesStatus === 'pending' || tenantsStatus === 'pending'">
@@ -631,7 +756,10 @@ async function removeAssignment() {
             {{ feedback.message }}
           </div>
 
-          <div v-if="user.assignments.length === 0" class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted">
+          <div
+            v-if="user.assignments.length === 0"
+            class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted"
+          >
             visible assignment はまだありません。上のフォームから追加できます。
           </div>
 
@@ -718,7 +846,10 @@ async function removeAssignment() {
                 {{ pendingRemovalAssignment.scope.layer }} / {{ pendingRemovalAssignment.scope.code }}
               </p>
               <div class="mt-3 flex flex-wrap items-center gap-2">
-                <UBadge :color="pendingRemovalUserManageAccess.tone" variant="soft">
+                <UBadge
+                  :color="pendingRemovalUserManageAccess.tone"
+                  variant="soft"
+                >
                   user.manage: {{ pendingRemovalUserManageAccess.label }}
                 </UBadge>
                 <p class="text-xs text-muted">
@@ -728,10 +859,19 @@ async function removeAssignment() {
             </div>
 
             <div class="flex justify-end gap-2">
-              <UButton color="neutral" variant="soft" :disabled="deletingAssignmentId !== null" @click="closeRemoveDialog">
+              <UButton
+                color="neutral"
+                variant="soft"
+                :disabled="deletingAssignmentId !== null"
+                @click="closeRemoveDialog"
+              >
                 Cancel
               </UButton>
-              <UButton color="error" :loading="deletingAssignmentId !== null" @click="removeAssignment">
+              <UButton
+                color="error"
+                :loading="deletingAssignmentId !== null"
+                @click="removeAssignment"
+              >
                 Remove
               </UButton>
             </div>

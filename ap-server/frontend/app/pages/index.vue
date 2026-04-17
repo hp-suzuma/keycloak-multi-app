@@ -108,12 +108,19 @@ onMounted(async () => {
                 </p>
               </div>
 
-              <UIcon name="i-lucide-panel-left" class="text-2xl text-primary" />
+              <UIcon
+                name="i-lucide-panel-left"
+                class="text-2xl text-primary"
+              />
             </div>
           </template>
 
           <div class="space-y-5">
-            <section v-for="group in navGroups" :key="group.title" class="space-y-2">
+            <section
+              v-for="group in navGroups"
+              :key="group.title"
+              class="space-y-2"
+            >
               <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                 {{ group.title }}
               </p>
@@ -124,7 +131,10 @@ onMounted(async () => {
                 :to="item.to"
                 class="flex items-start gap-3 rounded-2xl border border-default px-4 py-3 transition hover:border-primary/40 hover:bg-cyan-50/60 dark:hover:bg-cyan-950/20"
               >
-                <UIcon :name="item.icon" class="mt-0.5 size-5 text-primary" />
+                <UIcon
+                  :name="item.icon"
+                  class="mt-0.5 size-5 text-primary"
+                />
                 <div>
                   <p class="text-sm font-medium text-highlighted">
                     {{ item.label }}

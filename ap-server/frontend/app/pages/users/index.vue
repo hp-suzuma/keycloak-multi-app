@@ -8,7 +8,7 @@ definePageMeta({
 })
 
 const route = useRoute()
-const { mode, currentUser, authorization } = useApAuth()
+const { mode, currentUser, authorization, needsAuthRecovery, authRecoveryKind, globalLoginUrl } = useApAuth()
 const { listScopes, listUsers } = useApUserManagement()
 
 const serviceScopeId = computed(() => {
@@ -28,7 +28,7 @@ const keyword = computed(() => typeof route.query.keyword === 'string' ? route.q
 const sort = computed(() => typeof route.query.sort === 'string' ? route.query.sort : 'email')
 const keywordDraft = ref(keyword.value)
 
-watch(keyword, value => {
+watch(keyword, (value) => {
   keywordDraft.value = value
 })
 
@@ -85,6 +85,21 @@ const activeScope = computed(() => selectedTenant.value ?? selectedService.value
 const userManageAccess = computed(() =>
   resolvePermissionAccessStatus(authorization.value, 'user.manage', activeScope.value?.id)
 )
+const authRecoveryMessage = computed(() => {
+  if (authRecoveryKind.value === 'setup') {
+    return 'users 一覧の本番向け復旧導線は `global.example.com/login` です。Auth Entry の token 設定は live debug 用としてだけ使います。'
+  }
+
+  if (authRecoveryKind.value === 'refresh') {
+    return '期限切れ token では Auth Entry が `null current_user`、users API が `403` になりやすいため、まず SSO Login へ戻します。live debug を続ける時だけ fresh token を更新してください。'
+  }
+
+  if (authRecoveryKind.value === 'retry') {
+    return 'users API で `401/403` が続く時は、実運用では SSO Login へ戻します。live debug の切り分けでは Auth Entry で token と API Base を確認してください。'
+  }
+
+  return null
+})
 
 const sortOptions = [
   { label: 'メールアドレス A-Z', value: 'email' },
@@ -163,7 +178,11 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
     <section class="grid gap-6 rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-xl shadow-cyan-950/5 backdrop-blur lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] dark:border-white/10 dark:bg-stone-900/70">
       <div class="space-y-5">
         <div class="space-y-3">
-          <UBadge color="primary" variant="soft" class="rounded-full px-4 py-1 text-xs font-semibold tracking-[0.24em]">
+          <UBadge
+            color="primary"
+            variant="soft"
+            class="rounded-full px-4 py-1 text-xs font-semibold tracking-[0.24em]"
+          >
             USER MANAGEMENT
           </UBadge>
 
@@ -188,7 +207,10 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                   `NUXT_PUBLIC_AP_USER_MANAGEMENT_MODE`
                 </p>
               </div>
-              <UBadge :color="mode === 'live' ? 'success' : 'warning'" variant="soft">
+              <UBadge
+                :color="mode === 'live' ? 'success' : 'warning'"
+                variant="soft"
+              >
                 {{ mode === 'live' ? 'LIVE API' : 'MOCK DATA' }}
               </UBadge>
             </div>
@@ -199,10 +221,16 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           </p>
         </UCard>
 
-        <UCard v-if="mode === 'live'" class="border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20">
+        <UCard
+          v-if="mode === 'live'"
+          class="border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20"
+        >
           <template #header>
             <div class="flex items-center gap-2 text-sm font-semibold">
-              <UIcon name="i-lucide-badge-alert" class="text-amber-600" />
+              <UIcon
+                name="i-lucide-badge-alert"
+                class="text-amber-600"
+              />
               Live Check
             </div>
           </template>
@@ -213,12 +241,47 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           <p class="mt-2 text-xs leading-5 text-muted">
             正常系では Auth Entry の `Current User` が `Alice A` になり、`user.manage` を持った状態でこの一覧が開きます。
           </p>
+          <div
+            v-if="needsAuthRecovery && authRecoveryMessage"
+            class="mt-4 rounded-2xl border border-amber-300/70 bg-white/70 p-4 dark:bg-stone-950/30"
+          >
+            <p class="text-sm font-semibold text-highlighted">
+              Re-auth Flow
+            </p>
+            <p class="mt-2 text-sm text-toned">
+              {{ authRecoveryMessage }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <UButton
+                :to="globalLoginUrl"
+                color="primary"
+                variant="soft"
+                trailing-icon="i-lucide-log-in"
+              >
+                SSO Login
+              </UButton>
+              <UButton
+                to="/#auth-entry"
+                color="neutral"
+                variant="soft"
+                trailing-icon="i-lucide-arrow-up-right"
+              >
+                Auth Entry Debug
+              </UButton>
+            </div>
+          </div>
         </UCard>
 
-        <UCard v-if="currentUser" class="border-default bg-stone-50/70 dark:bg-stone-950/40">
+        <UCard
+          v-if="currentUser"
+          class="border-default bg-stone-50/70 dark:bg-stone-950/40"
+        >
           <template #header>
             <div class="flex items-center gap-2 text-sm font-semibold">
-              <UIcon name="i-lucide-user-round-check" class="text-primary" />
+              <UIcon
+                name="i-lucide-user-round-check"
+                class="text-primary"
+              />
               CurrentUser
             </div>
           </template>
@@ -238,7 +301,10 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           <UCard>
             <template #header>
               <div class="flex items-center gap-2 text-sm font-semibold">
-                <UIcon name="i-lucide-git-branch-plus" class="text-primary" />
+                <UIcon
+                  name="i-lucide-git-branch-plus"
+                  class="text-primary"
+                />
                 Step 1
               </div>
             </template>
@@ -250,7 +316,10 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           <UCard>
             <template #header>
               <div class="flex items-center gap-2 text-sm font-semibold">
-                <UIcon name="i-lucide-search" class="text-primary" />
+                <UIcon
+                  name="i-lucide-search"
+                  class="text-primary"
+                />
                 Step 2
               </div>
             </template>
@@ -274,7 +343,12 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                     初回は query なしでも一覧表示
                   </p>
                 </div>
-                <UButton color="neutral" variant="ghost" size="xs" @click="selectService()">
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  @click="selectService()"
+                >
                   Clear
                 </UButton>
               </div>
@@ -296,12 +370,18 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                     {{ scope.code }}
                   </p>
                 </div>
-                <UBadge color="neutral" variant="soft">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                >
                   service
                 </UBadge>
               </button>
 
-              <p v-if="servicesStatus === 'pending'" class="text-sm text-muted">
+              <p
+                v-if="servicesStatus === 'pending'"
+                class="text-sm text-muted"
+              >
                 service scopes を読み込み中です。
               </p>
             </div>
@@ -318,17 +398,29 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                     service 選択後に tenant を絞り込み
                   </p>
                 </div>
-                <UButton color="neutral" variant="ghost" size="xs" :disabled="!tenantScopeId" @click="selectTenant()">
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  :disabled="!tenantScopeId"
+                  @click="selectTenant()"
+                >
                   Clear
                 </UButton>
               </div>
             </template>
 
-            <div v-if="!serviceScopeId" class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted">
+            <div
+              v-if="!serviceScopeId"
+              class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted"
+            >
               先に service を選ぶと tenant 候補を表示します。
             </div>
 
-            <div v-else class="space-y-3">
+            <div
+              v-else
+              class="space-y-3"
+            >
               <button
                 v-for="scope in tenants"
                 :key="scope.id"
@@ -344,15 +436,24 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                     {{ scope.code }}
                   </p>
                 </div>
-                <UBadge color="neutral" variant="soft">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                >
                   tenant
                 </UBadge>
               </button>
 
-              <p v-if="tenantsStatus === 'pending'" class="text-sm text-muted">
+              <p
+                v-if="tenantsStatus === 'pending'"
+                class="text-sm text-muted"
+              >
                 tenant scopes を読み込み中です。
               </p>
-              <p v-else-if="tenants.length === 0" class="text-sm text-muted">
+              <p
+                v-else-if="tenants.length === 0"
+                class="text-sm text-muted"
+              >
                 この service 配下に表示できる tenant はまだありません。
               </p>
             </div>
@@ -372,14 +473,21 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
               </div>
 
               <div class="flex flex-col gap-3 sm:flex-row">
-                <form class="flex gap-2" @submit.prevent="applyKeyword">
+                <form
+                  class="flex gap-2"
+                  @submit.prevent="applyKeyword"
+                >
                   <input
                     v-model="keywordDraft"
                     type="search"
                     placeholder="名前 / メールアドレスで検索"
                     class="w-full min-w-64 rounded-xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                   >
-                  <UButton type="submit" color="primary" variant="soft">
+                  <UButton
+                    type="submit"
+                    color="primary"
+                    variant="soft"
+                  >
                     Search
                   </UButton>
                 </form>
@@ -391,7 +499,11 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                     class="rounded-xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                     @change="changeSort"
                   >
-                    <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                    <option
+                      v-for="option in sortOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
                       {{ option.label }}
                     </option>
                   </select>
@@ -401,10 +513,18 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           </template>
 
           <div class="flex flex-wrap gap-2 border-b border-default/80 bg-stone-50/70 px-6 py-4 text-xs text-muted dark:bg-stone-950/40">
-            <UBadge v-if="selectedService" color="neutral" variant="soft">
+            <UBadge
+              v-if="selectedService"
+              color="neutral"
+              variant="soft"
+            >
               service: {{ selectedService.name }}
             </UBadge>
-            <UBadge v-if="selectedTenant" color="primary" variant="soft">
+            <UBadge
+              v-if="selectedTenant"
+              color="primary"
+              variant="soft"
+            >
               tenant: {{ selectedTenant.name }}
             </UBadge>
             <UBadge
@@ -414,7 +534,11 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
             >
               user.manage: {{ userManageAccess.label }}
             </UBadge>
-            <UBadge v-if="keyword" color="warning" variant="soft">
+            <UBadge
+              v-if="keyword"
+              color="warning"
+              variant="soft"
+            >
               keyword: {{ keyword }}
             </UBadge>
             <span v-if="!selectedService && !selectedTenant && !keyword">
@@ -436,19 +560,31 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
             </p>
           </div>
 
-          <div v-if="usersStatus === 'pending'" class="px-6 py-10 text-sm text-muted">
+          <div
+            v-if="usersStatus === 'pending'"
+            class="px-6 py-10 text-sm text-muted"
+          >
             users 一覧を読み込み中です。
           </div>
 
-          <div v-else-if="usersErrorMessage" class="px-6 py-10 text-sm text-error">
+          <div
+            v-else-if="usersErrorMessage"
+            class="px-6 py-10 text-sm text-error"
+          >
             {{ usersErrorMessage }}
           </div>
 
-          <div v-else-if="users.length === 0" class="px-6 py-10 text-sm text-muted">
+          <div
+            v-else-if="users.length === 0"
+            class="px-6 py-10 text-sm text-muted"
+          >
             該当するユーザーがいません。
           </div>
 
-          <div v-else class="divide-y divide-default/80">
+          <div
+            v-else
+            class="divide-y divide-default/80"
+          >
             <NuxtLink
               v-for="user in users"
               :key="user.keycloak_sub"
@@ -480,7 +616,11 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
               </div>
 
               <div class="flex items-start justify-end">
-                <UButton color="neutral" variant="ghost" trailing-icon="i-lucide-arrow-right">
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  trailing-icon="i-lucide-arrow-right"
+                >
                   詳細
                 </UButton>
               </div>

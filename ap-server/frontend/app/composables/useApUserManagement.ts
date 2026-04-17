@@ -470,7 +470,7 @@ function withAuthorizationHeaders(token: string) {
   }
 
   return {
-    Authorization: `Bearer ${token}`,
+    'Authorization': `Bearer ${token}`,
     'X-Forwarded-Authorization': `Bearer ${token}`
   }
 }
