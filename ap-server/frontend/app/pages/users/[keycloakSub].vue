@@ -367,8 +367,7 @@ async function removeAssignment() {
           {{ mode === 'live' ? 'LIVE API' : 'MOCK DATA' }}
         </UBadge>
         <UButton
-          to="/users"
-          :query="backQuery"
+          :to="{ path: '/users', query: backQuery }"
           color="neutral"
           variant="soft"
           leading-icon="i-lucide-arrow-left"

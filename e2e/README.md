@@ -145,7 +145,14 @@ pnpm --dir e2e test:headed
 ## 現在のシナリオ
 
 - `tests/ap-frontend-sso-recovery.spec.ts`
-  `global.example.com/login -> ap.example.com/auth/bridge -> auth/callback -> /users?...` の自然復帰、users 一覧 / 詳細の header menu から `SSO Logout` を見つけられること、`SSO Logout -> global.example.com/logout/callback -> /?logged_out=1#auth-entry` の復帰を確認する
+  `global.example.com/login -> ap.example.com/auth/bridge -> auth/callback -> /users?...` の自然復帰、users 一覧 / 詳細の header menu から `SSO Logout` を見つけられること、`SSO Logout -> global.example.com/logout/callback -> /?logged_out=1#auth-entry` の復帰、さらに Auth Entry の `SSO Login` から元の users 詳細 route/query へ戻り直せることを確認する
+
+### users 詳細から logout したあとも Auth Entry の `SSO Login` で同じ文脈へ戻す
+
+- 背景: 直近の browser 実測で `SSO Logout -> Auth Entry` までは確認できていたが、その後の `SSO Login` は root へ戻るだけで、users 詳細の route/query を復元できていなかった。users 管理の本命シナリオとしては、session を閉じたあとでも元の文脈へ戻れることを 1 本で見たい段階だった
+- 決定事項: Playwright の `ap-frontend-sso-recovery` に、users 一覧から `tenant-user-b` 詳細へ入り、`SSO Logout` 後に Auth Entry から再ログインして同じ `/users/tenant-user-b?service_scope_id=2&tenant_scope_id=3&sort=-email` へ戻る確認を追加した。再ログイン後は Keycloak credential をもう一度入力し、最後は「一覧へ戻る」を実際に押して `/users?service_scope_id=2&tenant_scope_id=3&sort=-email` へ戻るところまで確認する
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、今後の logout/re-login 回帰確認
+- 次の推奨アクション: 次は users 一覧の keyword 付き条件や detail 画面の assignment 操作前後でも route/query 復帰が保たれるかを追加し、recovery シナリオの coverage を広げる
 
 ## 補足
 

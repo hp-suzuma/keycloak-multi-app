@@ -1,4 +1,5 @@
 const PKCE_STORAGE_KEY = 'ap-sso-pkce'
+const LOGOUT_RETURN_NEXT_STORAGE_KEY = 'ap-sso-logout-return-next'
 
 interface PkceSessionState {
   state: string
@@ -58,7 +59,48 @@ export function useApSso() {
     return normalizeNextPath(route.fullPath, '/')
   }
 
-  function bridgeUrl(next = currentNextPath()) {
+  function readStoredLogoutReturnNext(): string | null {
+    if (!import.meta.client) {
+      return null
+    }
+
+    const raw = localStorage.getItem(LOGOUT_RETURN_NEXT_STORAGE_KEY)
+
+    if (!raw) {
+      return null
+    }
+
+    return normalizeNextPath(raw, '/')
+  }
+
+  function storeLogoutReturnNext(next = currentNextPath()) {
+    if (!import.meta.client) {
+      return
+    }
+
+    localStorage.setItem(
+      LOGOUT_RETURN_NEXT_STORAGE_KEY,
+      normalizeNextPath(next, '/')
+    )
+  }
+
+  function clearStoredLogoutReturnNext() {
+    if (!import.meta.client) {
+      return
+    }
+
+    localStorage.removeItem(LOGOUT_RETURN_NEXT_STORAGE_KEY)
+  }
+
+  function loginReturnPath() {
+    if (route.query.logged_out === '1') {
+      return readStoredLogoutReturnNext() ?? '/'
+    }
+
+    return currentNextPath()
+  }
+
+  function bridgeUrl(next = loginReturnPath()) {
     const url = new URL('/auth/bridge', frontendBaseUrl.value)
     url.searchParams.set('next', normalizeNextPath(next))
 
@@ -77,7 +119,7 @@ export function useApSso() {
     return url.toString()
   }
 
-  function globalLoginUrl(next = currentNextPath()) {
+  function globalLoginUrl(next = loginReturnPath()) {
     const url = new URL(globalLoginBaseUrl.value)
     url.searchParams.set('return_to', bridgeUrl(next))
 
@@ -199,6 +241,7 @@ export function useApSso() {
     })
 
     clearStoredState()
+    clearStoredLogoutReturnNext()
 
     if (!response.access_token) {
       throw new Error('Keycloak token response did not include an access token.')
@@ -220,6 +263,9 @@ export function useApSso() {
     logoutReturnUrl,
     globalLoginUrl,
     globalLogoutUrl,
+    storeLogoutReturnNext,
+    readStoredLogoutReturnNext,
+    clearStoredLogoutReturnNext,
     startBridgeSession,
     completeBridgeSession,
     clearStoredState

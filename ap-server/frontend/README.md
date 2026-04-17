@@ -436,3 +436,17 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: users 一覧 / 詳細の `Re-auth Flow` に「`SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻る」案内を追加した。Playwright 実測でも users 一覧で `SSO Logout` menu item が見つかり、そのまま users 詳細へ進んだ後も同じ menu item が見つかることを確認してから logout を実行している
 - 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 画面の auth recovery 文言、今後の logout discoverability 確認
 - 次の推奨アクション: 次は users 詳細で logout 後に戻った Auth Entry から再ログインし、元の users 文脈へ戻り直す導線まで 1 本の browser シナリオとして確認する
+
+### logout 後の Auth Entry では直前の users 文脈を覚えて再ログインへ戻す
+
+- 背景: `SSO Logout -> /?logged_out=1#auth-entry` までは通っていたが、その状態の `SSO Login` は `route.fullPath` をそのまま使うため、再ログイン後の戻り先が `/` に落ちていた。今回の本命は users 一覧 / 詳細から logout したあと、同じ users 文脈へ戻り直せることだった
+- 決定事項: `SSO Logout` 実行前に AP Frontend 側で現在の route を localStorage へ退避し、`logged_out=1` で表示された Auth Entry 上の `SSO Login` だけがその退避先を優先して `global.example.com/login -> /auth/bridge -> /auth/callback` の `next` に使う。再ログイン成功時には退避済み path を消し、通常時の `SSO Login` は引き続き現在画面の route を使う
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、logout 後の再ログイン UX、今後の users 文脈復帰確認
+- 次の推奨アクション: 次は users 詳細だけでなく、keyword 付き users 一覧や assignment 操作直前の detail state でも「logout 後の再ログインが同じ route/query に戻るか」を広げて確認する
+
+### users 詳細の「一覧へ戻る」は route object で query を引き継ぐ
+
+- 背景: logout 後に users 詳細へ戻り直す browser シナリオを詰める中で、詳細 URL 自体は `service_scope_id` / `tenant_scope_id` / `sort` 付きで復元できていた一方、「一覧へ戻る」だけが `/users` に落ちていた。`UButton` に `to` と `query` を別 prop で渡しても、実 navigation では query が引き継がれていなかった
+- 決定事項: users 詳細の back link は `to="/users"` + `query` 別指定ではなく、`{ path: '/users', query: backQuery }` の route object で渡す。これにより users 詳細から一覧へ戻る時も drill-down query を維持する
+- 影響範囲: `ap-server/frontend/app/pages/users/[keycloakSub].vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 詳細から一覧へ戻る導線、logout/re-login 後の文脈復帰確認
+- 次の推奨アクション: 次は users 詳細で assignment 操作後にも同じ back link が query を保つかを browser で追加確認する

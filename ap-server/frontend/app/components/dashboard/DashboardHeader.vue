@@ -17,6 +17,7 @@ const {
   clearClientAuth,
   refreshCurrentUser
 } = useApAuth()
+const { storeLogoutReturnNext } = useApSso()
 
 const roleBadge = computed(() => dashboardRoleBadge(authorization.value))
 const headerTitle = computed(() => {
@@ -47,6 +48,7 @@ const menuItems = computed(() => [
         label: 'SSO Logout',
         icon: 'i-lucide-log-out',
         async onSelect() {
+          storeLogoutReturnNext()
           clearClientAuth()
           await navigateTo(globalLogoutUrl.value, { external: true })
         }

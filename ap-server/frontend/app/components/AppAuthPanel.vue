@@ -18,6 +18,7 @@ const {
   clearClientAuth,
   refreshCurrentUser
 } = useApAuth()
+const { storeLogoutReturnNext } = useApSso()
 
 const RECOMMENDED_AP_API_BASE = 'https://ap-backend-fpm.example.com/api'
 const route = useRoute()
@@ -117,6 +118,7 @@ async function refreshOnly() {
 }
 
 async function signOutFromSso() {
+  storeLogoutReturnNext()
   clearClientAuth()
   await navigateTo(globalLogoutUrl.value, { external: true })
 }
