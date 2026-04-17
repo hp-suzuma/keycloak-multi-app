@@ -366,3 +366,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/doctor.mjs` でも `/etc/apt/sources.list.d/ubuntu.sources` と `/etc/apt/sources.list` を見て、`archive.ubuntu.com` / `security.ubuntu.com` が `http` のままなら warning 相当ではなく失敗として返すようにした
 - 影響範囲: 新しい Ubuntu Server での初回 browser セットアップ、`doctor -> install:ubuntu-libs` の順序、apt network troubleshooting の開始地点
 - 次の推奨アクション: 次は別の Ubuntu Server でも `pnpm --dir e2e run doctor` を最初に流し、apt source が `http` のままなら `https` へ直してから library 導入に進む
+
+### fresh Ubuntu Server の通し確認は `verify:ubuntu` に寄せる
+
+- 背景: 新しい server では `doctor`, `wait:stack`, `test:sso:auto` を順に打つ必要があり、確認順序が人によってぶれやすかった
+- 決定事項: `e2e/scripts/verify-ubuntu-e2e.sh` と `pnpm --dir e2e run verify:ubuntu` を追加し、fresh server の通し確認はこのコマンドを入口にする。中では `doctor -> wait:stack -> test:sso:auto` を順に流す
+- 影響範囲: 新しい Ubuntu Server での browser 実測開始手順、初回セットアップ後の smoke test、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server で `pnpm --dir e2e run verify:ubuntu` を実行し、`doctor` の apt source 判定から `test:sso:auto` まで同じ導線で通るかを確認する

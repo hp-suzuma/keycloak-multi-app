@@ -52,6 +52,14 @@ pnpm --dir e2e run doctor
 pnpm --dir e2e run wait:stack
 ```
 
+fresh server の通し確認を 1 コマンドで流したい時は、次を使います。
+
+```bash
+pnpm --dir e2e run verify:ubuntu
+```
+
+これは `doctor -> wait:stack -> test:sso:auto` を順に実行します。
+
 `doctor` は次をまとめて確認します。
 
 - `Node 22+`
