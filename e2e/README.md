@@ -37,6 +37,12 @@ pnpm --dir e2e run bootstrap:ubuntu
 資格情報や URL を明示したい時は [e2e/.env.example](/home/wsat/projects/keycloak-multi-app/e2e/.env.example) を元に `e2e/.env` を調整します。
 `sudo` なしで `playwright install --with-deps` が止まるサーバでは、bootstrap は browser 本体だけ入れて続行します。
 
+root 権限が取れるタイミングで Ubuntu 直の Chromium 依存 library を入れる時は、次を使います。
+
+```bash
+pnpm --dir e2e run install:ubuntu-libs
+```
+
 ## 実行前チェック
 
 Ubuntu Server へ入れた直後は、まず browser 実行前提だけ先に確認します。
@@ -102,3 +108,4 @@ pnpm --dir e2e test:headed
 - `/etc/hosts` を触れないサーバでは `PLAYWRIGHT_HOST_MAP` で `*.example.com=127.0.0.1` を渡せる
 - Ubuntu 直の Chromium が `libatk-1.0.so.0` などの shared library で起動できない時は、`docker run --rm --network host mcr.microsoft.com/playwright:v1.59.1-noble ...` の Playwright 公式コンテナで `test:sso` を流せる
 - `test:sso:auto` は library 不足時だけ container fallback し、アプリ側 assertion 失敗では自動再実行しない
+- 実機で確認した不足 library は `libatk1.0-0t64`, `libatk-bridge2.0-0t64`, `libcups2t64`, `libasound2t64`, `libgbm1`, `libcairo2`, `libpango-1.0-0`, `libxcomposite1`, `libxdamage1`, `libxfixes3`, `libxrandr2`, `libatspi2.0-0t64`

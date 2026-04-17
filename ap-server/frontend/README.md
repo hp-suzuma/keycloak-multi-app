@@ -345,3 +345,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/run-sso-auto.sh` を追加し、標準入口は `pnpm --dir e2e run test:sso:auto` に寄せる。これはまず Ubuntu 直の `test:sso` を試し、`browserType.launch` や `libatk-1.0.so.0` 由来の library エラー時だけ `test:sso:container` へ fallback する。アプリ側 assertion 失敗では自動 fallback せず、そのままテスト失敗として扱う
 - 影響範囲: Ubuntu Server 直の Playwright 実行運用、Playwright 公式コンテナの呼び出し手順、今後の AP Frontend SSO 回帰の入口コマンド
 - 次の推奨アクション: 次は Ubuntu Server 上で `pnpm --dir e2e run test:sso:auto` を定常運用コマンドにしつつ、別途 root 権限が取れるタイミングで Chromium 依存 library を導入し、auto fallback せずローカルだけで通る状態へ寄せる
+
+### Ubuntu 直の Chromium 依存 library は installer script でまとめて入れる
+
+- 背景: 実機の `ldd` では `libatk-1.0.so.0`, `libatk-bridge-2.0.so.0`, `libcups.so.2`, `libasound.so.2`, `libgbm.so.1`, `libcairo.so.2`, `libpango-1.0.so.0`, `libXcomposite.so.1`, `libXdamage.so.1`, `libXfixes.so.3`, `libXrandr.so.2`, `libatspi.so.0` が不足していたが、作業時点では `sudo` パスワードが無く即時導入までは進められなかった
+- 決定事項: root 権限が取れるタイミングに備えて `e2e/scripts/install-ubuntu-playwright-libs.sh` と `pnpm --dir e2e run install:ubuntu-libs` を追加し、この Ubuntu 24 系サーバで必要だった package 群を 1 回で入れられるようにした
+- 影響範囲: Ubuntu 直の Playwright/Chromium 実行、browser 実測の root 作業手順、今後の server セットアップ再現性
+- 次の推奨アクション: 次は root 権限が使えるタイミングで `pnpm --dir e2e run install:ubuntu-libs` を実行し、その直後に `pnpm --dir e2e run test:sso` を再実行して container fallback なしで pass するか確認する
