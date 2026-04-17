@@ -39,7 +39,7 @@ install_nvm_if_needed() {
 
 load_nvm() {
   # shellcheck disable=SC1090
-  . "$HOME/.nvm/nvm.sh"
+  . "$HOME/.nvm/nvm.sh" --no-use
 }
 
 ensure_node() {
@@ -87,7 +87,13 @@ install_e2e_deps() {
 
 install_browsers() {
   log "installing Playwright Chromium and Ubuntu dependencies..."
-  pnpm --dir "$E2E_DIR" run install:browsers
+  if pnpm --dir "$E2E_DIR" run install:browsers; then
+    return
+  fi
+
+  warn "Playwright system dependency install failed. This usually means sudo or root access is required on Ubuntu."
+  warn "Falling back to browser-only install so doctor and container-based test runs can continue."
+  pnpm --dir "$E2E_DIR" exec playwright install chromium
 }
 
 seed_env() {

@@ -2,6 +2,17 @@ import dns from 'node:dns/promises'
 import process from 'node:process'
 import { request as httpsRequest } from 'node:https'
 
+const hostMap = new Map(
+  (process.env.PLAYWRIGHT_HOST_MAP ??
+    'ap.example.com=127.0.0.1,global.example.com=127.0.0.1,keycloak.example.com=127.0.0.1,ap-backend-fpm.example.com=127.0.0.1')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => entry.split('='))
+    .filter((entry) => entry.length === 2)
+    .map(([host, address]) => [host.trim(), address.trim()])
+)
+
 const requiredNodeMajor = 22
 const requiredHosts = [
   'ap.example.com',
@@ -33,6 +44,14 @@ function checkNodeVersion() {
 }
 
 async function resolveHost(host) {
+  const mappedAddress = hostMap.get(host)
+  if (mappedAddress) {
+    return {
+      ok: true,
+      message: `${host} resolves to ${mappedAddress} via PLAYWRIGHT_HOST_MAP.`
+    }
+  }
+
   try {
     const addresses = await dns.lookup(host, { all: true })
 
@@ -51,11 +70,36 @@ async function resolveHost(host) {
 
 function fetchStatus(url) {
   return new Promise((resolve) => {
+    const target = new URL(url)
     const req = httpsRequest(
       url,
       {
         method: 'GET',
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
+        lookup(hostname, options, callback) {
+          const mappedAddress = hostMap.get(hostname)
+          if (mappedAddress) {
+            if (typeof options === 'object' && options?.all) {
+              callback(null, [{ address: mappedAddress, family: 4 }])
+              return
+            }
+
+            callback(null, mappedAddress, 4)
+            return
+          }
+
+          dns.lookup(hostname, options)
+            .then((result) => {
+              if (typeof result === 'string') {
+                callback(null, result, 4)
+                return
+              }
+
+              callback(null, result.address, result.family)
+            })
+            .catch((error) => callback(error))
+        },
+        servername: target.hostname
       },
       (res) => {
         res.resume()
@@ -139,6 +183,7 @@ for (const url of requiredUrls) {
 
 console.log(`[info] keycloak test user: ${username}`)
 console.log(`[info] keycloak password source: ${process.env.KEYCLOAK_PASSWORD ? 'env' : 'default value "password"'}`)
+console.log(`[info] host mapping source: ${process.env.PLAYWRIGHT_HOST_MAP ? 'env' : 'default PLAYWRIGHT_HOST_MAP'}`)
 console.log('[info] next command: pnpm --dir e2e run wait:stack && pnpm --dir e2e run test:sso')
 
 if (failures.length > 0) {

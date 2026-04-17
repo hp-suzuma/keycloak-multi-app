@@ -1,5 +1,17 @@
 import process from 'node:process'
 import { request as httpsRequest } from 'node:https'
+import dns from 'node:dns/promises'
+
+const hostMap = new Map(
+  (process.env.PLAYWRIGHT_HOST_MAP ??
+    'ap.example.com=127.0.0.1,global.example.com=127.0.0.1,keycloak.example.com=127.0.0.1,ap-backend-fpm.example.com=127.0.0.1')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => entry.split('='))
+    .filter((entry) => entry.length === 2)
+    .map(([host, address]) => [host.trim(), address.trim()])
+)
 
 const timeoutMs = Number.parseInt(process.env.PLAYWRIGHT_WAIT_TIMEOUT_MS ?? '120000', 10)
 const pollIntervalMs = Number.parseInt(process.env.PLAYWRIGHT_WAIT_INTERVAL_MS ?? '3000', 10)
@@ -16,11 +28,36 @@ function sleep(ms) {
 
 function fetchStatus(url) {
   return new Promise((resolve) => {
+    const target = new URL(url)
     const req = httpsRequest(
       url,
       {
         method: 'GET',
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
+        lookup(hostname, options, callback) {
+          const mappedAddress = hostMap.get(hostname)
+          if (mappedAddress) {
+            if (typeof options === 'object' && options?.all) {
+              callback(null, [{ address: mappedAddress, family: 4 }])
+              return
+            }
+
+            callback(null, mappedAddress, 4)
+            return
+          }
+
+          dns.lookup(hostname, options)
+            .then((result) => {
+              if (typeof result === 'string') {
+                callback(null, result, 4)
+                return
+              }
+
+              callback(null, result.address, result.family)
+            })
+            .catch((error) => callback(error))
+        },
+        servername: target.hostname
       },
       (res) => {
         res.resume()

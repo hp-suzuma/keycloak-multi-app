@@ -331,3 +331,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: Ubuntu Server 初回導入の入口は `pnpm --dir e2e run bootstrap:ubuntu` ではなく、Node 未導入でも動けるよう `bash e2e/scripts/bootstrap-ubuntu.sh` でも直接叩ける `e2e/scripts/bootstrap-ubuntu.sh` を正とする。Node 導入後は `doctor -> wait:stack -> test:sso` の順で AP Frontend の SSO 実測へ進む
 - 影響範囲: Ubuntu Server 直の browser 環境構築、`e2e/.env` の初期化、今後の Playwright 実測開始手順
 - 次の推奨アクション: 次は Ubuntu Server 上で `bash e2e/scripts/bootstrap-ubuntu.sh` を実行し、必要なら `e2e/.env` の認証情報を調整した上で `pnpm --dir e2e run doctor -> wait:stack -> test:sso` を流す
+
+### 実ブラウザの SSO recovery は `PLAYWRIGHT_HOST_MAP` と Playwright 公式コンテナでも通せる
+
+- 背景: Ubuntu Server 実機で `doctor` と `wait:stack` は通ったが、`/etc/hosts` を直接更新できない環境と、`libatk-1.0.so.0` 不足で Ubuntu 直の Chromium が起動できない環境差分が見えた。それでも AP Frontend の SSO recovery UI 実測は止めずに進めたかった
+- 決定事項: `e2e` では `PLAYWRIGHT_HOST_MAP` を既定で持ち、`ap.example.com`, `global.example.com`, `keycloak.example.com`, `ap-backend-fpm.example.com` を `127.0.0.1` へ解決できるようにした。Ubuntu 直の shared library が足りない時は `docker run --rm --network host --user 1000:1000 -e CI=true -v /home/wsat/projects/keycloak-multi-app:/work -w /work/e2e mcr.microsoft.com/playwright:v1.59.1-noble ...` で `test:sso` を流してよい
+- 影響範囲: Ubuntu Server 直の browser 実測、`e2e/playwright.config.ts` の host resolver、`e2e/scripts/doctor.mjs` と `wait-for-stack.mjs` の疎通確認、今後の AP Frontend SSO 回帰テスト
+- 次の推奨アクション: 次は Ubuntu Server 側で必要なら OS shared library を root 権限で整え、Ubuntu 直の `pnpm --dir e2e run test:sso` でも同じシナリオが通るかを確認する。暫定運用では Playwright 公式コンテナ実行を browser 実測の既定 fallback として扱ってよい

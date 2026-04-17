@@ -35,6 +35,7 @@ pnpm --dir e2e run bootstrap:ubuntu
 - `e2e/.env.example` からの `.env` 雛形作成
 
 資格情報や URL を明示したい時は [e2e/.env.example](/home/wsat/projects/keycloak-multi-app/e2e/.env.example) を元に `e2e/.env` を調整します。
+`sudo` なしで `playwright install --with-deps` が止まるサーバでは、bootstrap は browser 本体だけ入れて続行します。
 
 ## 実行前チェック
 
@@ -51,6 +52,7 @@ pnpm --dir e2e run wait:stack
 - `*.example.com` の名前解決
 - `ap.example.com`, `global.example.com/login`, `keycloak` OIDC discovery の疎通
 - Playwright 実行時に使う Keycloak 資格情報の参照元
+- `PLAYWRIGHT_HOST_MAP` を使った host mapping の有無
 
 `wait:stack` は Docker stack の起動直後に使う想定で、必要 URL が応答するまで待ちます。
 
@@ -83,3 +85,5 @@ pnpm --dir e2e test:headed
 - Keycloak の認証情報は `KEYCLOAK_USERNAME`, `KEYCLOAK_PASSWORD` で上書きできる
 - `PLAYWRIGHT_WAIT_TIMEOUT_MS`, `PLAYWRIGHT_WAIT_INTERVAL_MS` で stack 待機時間を調整できる
 - `bootstrap:ubuntu` は `curl` と `bash` が入っている Ubuntu Server を前提にしている
+- `/etc/hosts` を触れないサーバでは `PLAYWRIGHT_HOST_MAP` で `*.example.com=127.0.0.1` を渡せる
+- Ubuntu 直の Chromium が `libatk-1.0.so.0` などの shared library で起動できない時は、`docker run --rm --network host mcr.microsoft.com/playwright:v1.59.1-noble ...` の Playwright 公式コンテナで `test:sso` を流せる

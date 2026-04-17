@@ -11,12 +11,12 @@ test('AP Frontend recovers to the same users query after SSO login', async ({ pa
 
   await page.goto(globalLoginUrl.toString())
 
-  await page.getByLabel(/username|email/i).fill(process.env.KEYCLOAK_USERNAME ?? 'alice')
-  await page.getByLabel(/password/i).fill(process.env.KEYCLOAK_PASSWORD ?? 'password')
+  await page.locator('input[name="username"]').fill(process.env.KEYCLOAK_USERNAME ?? 'alice')
+  await page.locator('input[name="password"]').fill(process.env.KEYCLOAK_PASSWORD ?? 'password')
   await page.getByRole('button', { name: /sign in|log in/i }).click()
 
   await page.waitForURL(`**${usersPath}`)
 
-  await expect(page.getByText('Alice A')).toBeVisible()
-  await expect(page.getByText('user.manage')).toBeVisible()
+  await expect(page.getByRole('main').getByText('Alice A', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText(/user\.manage:\s+descendant access/i)).toBeVisible()
 })
