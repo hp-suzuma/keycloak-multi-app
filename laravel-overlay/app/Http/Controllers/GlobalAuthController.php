@@ -71,15 +71,26 @@ class GlobalAuthController extends Controller
         $idTokenHint = $request->session()->get('oidc_id_token');
         $postLogoutRedirect = $this->validatedAllowedRedirect($request->query('return_to'))
             ?? rtrim(config('app.url'), '/').'/';
+        $logoutCallbackUrl = rtrim(config('app.url'), '/').'/logout/callback?'.http_build_query([
+            'return_to' => $postLogoutRedirect,
+        ]);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->away($this->oidc->logoutUrl(
-            postLogoutRedirectUri: $postLogoutRedirect,
+            postLogoutRedirectUri: $logoutCallbackUrl,
             idTokenHint: $idTokenHint,
             clientId: config('services.keycloak.client_id'),
         ));
+    }
+
+    public function logoutCallback(Request $request): RedirectResponse
+    {
+        $returnTo = $this->validatedAllowedRedirect($request->query('return_to'))
+            ?? rtrim(config('app.url'), '/').'/';
+
+        return redirect()->away($returnTo);
     }
 
     private function validatedAllowedRedirect(mixed $value): ?string

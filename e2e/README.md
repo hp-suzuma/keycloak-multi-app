@@ -145,7 +145,7 @@ pnpm --dir e2e test:headed
 ## 現在のシナリオ
 
 - `tests/ap-frontend-sso-recovery.spec.ts`
-  `global.example.com/login -> ap.example.com/auth/bridge -> auth/callback -> /users?...` の自然復帰を確認する
+  `global.example.com/login -> ap.example.com/auth/bridge -> auth/callback -> /users?...` の自然復帰と、`SSO Logout -> global.example.com/logout/callback -> /?logged_out=1#auth-entry` の復帰を確認する
 
 ## 補足
 

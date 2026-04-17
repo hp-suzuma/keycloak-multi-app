@@ -422,3 +422,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: AP Frontend では session 終了を 2 系統に分ける。実運用向けには `global.example.com/logout?return_to=https://ap.example.com/?logged_out=1#auth-entry` を使う `SSO Logout` を用意し、押下前に AP Frontend 側の local token / current_user / authorization も clear する。debug 用には redirect を伴わない `Reset Session` を残し、token override と local auth state だけを外せるようにする
 - 影響範囲: `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、今後の logout 完了後 UX
 - 次の推奨アクション: 次は `SSO Logout` を実ブラウザで押して `logged_out=1#auth-entry` へ戻り、Auth Entry に logout 完了案内と再ログイン導線が期待どおり出るかを確認する
+
+### `SSO Logout` は global BFF の logout callback を挟むと `logged_out=1#auth-entry` まで戻せる
+
+- 背景: `SSO Logout` を browser 実測したところ、最初は Keycloak logout 後に `https://global.example.com/` へ戻ってしまい、AP Frontend の `logged_out=1#auth-entry` へは復帰できなかった。原因は `global-login` client の post logout redirect が `global.example.com/*` 前提で、AP へ直接返すと吸収されていたことだった
+- 決定事項: `global.example.com/logout` は Keycloak へ直接 AP URL を渡さず、いったん `global.example.com/logout/callback?return_to=...` を post logout redirect に使う。callback から `ap.example.com/?logged_out=1#auth-entry` へ server-side redirect し、Playwright 実測でも `SSO Logout -> Logout Complete -> Bearer Token: missing` まで確認できた
+- 影響範囲: `laravel-overlay/routes/web.php`、`laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/README.md`、AP Frontend の logout 完了後 UX、今後の logout 回帰確認
+- 次の推奨アクション: 次は logout 後の dashboard home だけでなく、users 一覧や users 詳細からでも同じ `SSO Logout` 導線が自然に見つかるかを確認し、必要なら users 画面の recovery 文言にも logout 後の戻り先を補足する
