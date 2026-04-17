@@ -338,3 +338,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e` では `PLAYWRIGHT_HOST_MAP` を既定で持ち、`ap.example.com`, `global.example.com`, `keycloak.example.com`, `ap-backend-fpm.example.com` を `127.0.0.1` へ解決できるようにした。Ubuntu 直の shared library が足りない時は `docker run --rm --network host --user 1000:1000 -e CI=true -v /home/wsat/projects/keycloak-multi-app:/work -w /work/e2e mcr.microsoft.com/playwright:v1.59.1-noble ...` で `test:sso` を流してよい
 - 影響範囲: Ubuntu Server 直の browser 実測、`e2e/playwright.config.ts` の host resolver、`e2e/scripts/doctor.mjs` と `wait-for-stack.mjs` の疎通確認、今後の AP Frontend SSO 回帰テスト
 - 次の推奨アクション: 次は Ubuntu Server 側で必要なら OS shared library を root 権限で整え、Ubuntu 直の `pnpm --dir e2e run test:sso` でも同じシナリオが通るかを確認する。暫定運用では Playwright 公式コンテナ実行を browser 実測の既定 fallback として扱ってよい
+
+### browser 実測の標準入口は `test:sso:auto` に寄せる
+
+- 背景: Ubuntu Server ごとに Chromium shared library の揺れがあり、毎回「まずローカルを試すか、最初から container へ行くか」を人が判断すると運用がぶれやすい
+- 決定事項: `e2e/scripts/run-sso-auto.sh` を追加し、標準入口は `pnpm --dir e2e run test:sso:auto` に寄せる。これはまず Ubuntu 直の `test:sso` を試し、`browserType.launch` や `libatk-1.0.so.0` 由来の library エラー時だけ `test:sso:container` へ fallback する。アプリ側 assertion 失敗では自動 fallback せず、そのままテスト失敗として扱う
+- 影響範囲: Ubuntu Server 直の Playwright 実行運用、Playwright 公式コンテナの呼び出し手順、今後の AP Frontend SSO 回帰の入口コマンド
+- 次の推奨アクション: 次は Ubuntu Server 上で `pnpm --dir e2e run test:sso:auto` を定常運用コマンドにしつつ、別途 root 権限が取れるタイミングで Chromium 依存 library を導入し、auto fallback せずローカルだけで通る状態へ寄せる

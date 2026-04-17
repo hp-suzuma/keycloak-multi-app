@@ -68,6 +68,20 @@ SSO 自然復帰だけを先に見たい時はこれで十分です。
 pnpm --dir e2e run test:sso
 ```
 
+Ubuntu 直の Chromium が shared library 不足で止まるサーバでは、次を標準入口にしてよいです。
+
+```bash
+pnpm --dir e2e run test:sso:auto
+```
+
+これはまず Ubuntu 直の `test:sso` を試し、`libatk-1.0.so.0` などの browser 起動失敗なら Playwright 公式コンテナへ自動 fallback します。
+
+コンテナ実行だけを明示したい時はこれを使います。
+
+```bash
+pnpm --dir e2e run test:sso:container
+```
+
 ### headless を避けたい時
 
 ```bash
@@ -87,3 +101,4 @@ pnpm --dir e2e test:headed
 - `bootstrap:ubuntu` は `curl` と `bash` が入っている Ubuntu Server を前提にしている
 - `/etc/hosts` を触れないサーバでは `PLAYWRIGHT_HOST_MAP` で `*.example.com=127.0.0.1` を渡せる
 - Ubuntu 直の Chromium が `libatk-1.0.so.0` などの shared library で起動できない時は、`docker run --rm --network host mcr.microsoft.com/playwright:v1.59.1-noble ...` の Playwright 公式コンテナで `test:sso` を流せる
+- `test:sso:auto` は library 不足時だけ container fallback し、アプリ側 assertion 失敗では自動再実行しない

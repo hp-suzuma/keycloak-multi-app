@@ -8,6 +8,8 @@
     "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "test": "playwright test",
     "test:sso": "playwright test tests/ap-frontend-sso-recovery.spec.ts",
+    "test:sso:auto": "bash ./scripts/run-sso-auto.sh",
+    "test:sso:container": "bash ./scripts/run-sso-container.sh",
     "test:headed": "playwright test --headed",
     "codegen": "playwright codegen https://ap.example.com",
     "install:browsers": "playwright install --with-deps chromium"

@@ -65,6 +65,7 @@ pnpm --dir e2e run test:sso
 Ubuntu Server に browser 実行環境を初回導入する時は、`pnpm --dir e2e run bootstrap:ubuntu` を入口にする。
 このスクリプトが `nvm -> Node 22 -> corepack/pnpm -> Playwright Chromium` までまとめて整える。
 `/etc/hosts` を触れないサーバは `PLAYWRIGHT_HOST_MAP` を使い、Ubuntu 直の shared library が足りない時は Playwright 公式コンテナで browser 実測を継続する。
+日常運用では `pnpm --dir e2e run test:sso:auto` を SSO browser 実測の標準入口として扱ってよい。
 
 ### `bff-b` の扱い
 
