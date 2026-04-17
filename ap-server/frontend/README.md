@@ -352,3 +352,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: root 権限が取れるタイミングに備えて `e2e/scripts/install-ubuntu-playwright-libs.sh` と `pnpm --dir e2e run install:ubuntu-libs` を追加し、この Ubuntu 24 系サーバで必要だった package 群を 1 回で入れられるようにした
 - 影響範囲: Ubuntu 直の Playwright/Chromium 実行、browser 実測の root 作業手順、今後の server セットアップ再現性
 - 次の推奨アクション: 次は root 権限が使えるタイミングで `pnpm --dir e2e run install:ubuntu-libs` を実行し、その直後に `pnpm --dir e2e run test:sso` を再実行して container fallback なしで pass するか確認する
+
+### この Ubuntu Server では apt source を `https` に替えたあとローカル `test:sso` まで通った
+
+- 背景: `install:ubuntu-libs` 実行中に `archive.ubuntu.com` / `security.ubuntu.com` への `http` 接続が繰り返し timeout し、package download が進まなかった
+- 決定事項: Ubuntu 側の `/etc/apt/sources.list.d/ubuntu.sources` の `URIs` を `http://archive.ubuntu.com/ubuntu/` / `http://security.ubuntu.com/ubuntu/` から `https://...` へ変更したうえで library 導入を進めた。結果として、この実機では Ubuntu 直の `pnpm --dir e2e run test:sso` が pass し、container fallback なしでも AP Frontend の SSO recovery を確認できた
+- 影響範囲: Ubuntu Server の apt 運用、`install:ubuntu-libs` 実行前の network troubleshooting、今後の browser 実測の既定手順
+- 次の推奨アクション: 次は `test:sso:auto` を日常入口として維持しつつ、別の Ubuntu Server を立てる時も apt source を最初から `https` に寄せるか確認する

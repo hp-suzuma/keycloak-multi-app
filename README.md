@@ -67,6 +67,7 @@ Ubuntu Server に browser 実行環境を初回導入する時は、`pnpm --dir 
 `/etc/hosts` を触れないサーバは `PLAYWRIGHT_HOST_MAP` を使い、Ubuntu 直の shared library が足りない時は Playwright 公式コンテナで browser 実測を継続する。
 日常運用では `pnpm --dir e2e run test:sso:auto` を SSO browser 実測の標準入口として扱ってよい。
 root 権限が取れるタイミングでは `pnpm --dir e2e run install:ubuntu-libs` を実行し、最終的には Ubuntu 直の `pnpm --dir e2e run test:sso` が通る状態へ寄せる。
+この Ubuntu Server では apt source の `URIs` を `http://archive.ubuntu.com` / `http://security.ubuntu.com` から `https://...` に変更したあと、Ubuntu 直の `pnpm --dir e2e run test:sso` が pass した。
 
 ### `bff-b` の扱い
 

@@ -81,6 +81,7 @@ pnpm --dir e2e run test:sso:auto
 ```
 
 これはまず Ubuntu 直の `test:sso` を試し、`libatk-1.0.so.0` などの browser 起動失敗なら Playwright 公式コンテナへ自動 fallback します。
+この Ubuntu Server では shared library 導入後にローカル `pnpm --dir e2e run test:sso` も pass したが、日常運用の入口は引き続き `test:sso:auto` に寄せてよいです。
 
 コンテナ実行だけを明示したい時はこれを使います。
 
@@ -109,3 +110,4 @@ pnpm --dir e2e test:headed
 - Ubuntu 直の Chromium が `libatk-1.0.so.0` などの shared library で起動できない時は、`docker run --rm --network host mcr.microsoft.com/playwright:v1.59.1-noble ...` の Playwright 公式コンテナで `test:sso` を流せる
 - `test:sso:auto` は library 不足時だけ container fallback し、アプリ側 assertion 失敗では自動再実行しない
 - 実機で確認した不足 library は `libatk1.0-0t64`, `libatk-bridge2.0-0t64`, `libcups2t64`, `libasound2t64`, `libgbm1`, `libcairo2`, `libpango-1.0-0`, `libxcomposite1`, `libxdamage1`, `libxfixes3`, `libxrandr2`, `libatspi2.0-0t64`
+- apt source が `archive.ubuntu.com` / `security.ubuntu.com` の `http` で詰まる場合は、Ubuntu 側の `ubuntu.sources` を `https` へ変更してから `pnpm --dir e2e run install:ubuntu-libs` を再実行する

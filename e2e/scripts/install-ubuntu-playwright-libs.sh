@@ -18,6 +18,6 @@ packages=(
 )
 
 printf '[e2e] installing Ubuntu Playwright shared libraries...\n'
-sudo apt-get update
-sudo apt-get install -y "${packages[@]}"
+sudo apt-get -o Acquire::ForceIPv4=true update
+sudo apt-get -o Acquire::ForceIPv4=true install -y "${packages[@]}"
 printf '[e2e] install complete. You can retry: pnpm --dir e2e run test:sso\n'
