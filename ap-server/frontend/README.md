@@ -394,3 +394,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `doctor` には `E2E_UBUNTU_SOURCE_FILES`、`fix-ubuntu-apt-sources` には `E2E_UBUNTU_SOURCE_TARGET` の override 口を追加し、`e2e/scripts/selfcheck-recover-ubuntu.sh` と `pnpm --dir e2e run selfcheck:recover-ubuntu` で temp の `ubuntu.sources` fixture を `http` から `https` へ直せるかを自己検証できるようにした
 - 影響範囲: recovery 分岐のローカル検証、別 server 実機が無い段階での回帰確認、`doctor/fix/recover` のテスト容易性
 - 次の推奨アクション: 次は `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp fixture 上で `recover:ubuntu` の修正分岐が通ることを確認する
+
+### 別 server 実機の切り分けは `report:ubuntu` を先に採る
+
+- 背景: 実機で `recover:ubuntu` や `verify:ubuntu` が詰まった時、会話ごとに `uname`, apt source, `doctor`, `ldd`, `wait:stack` を個別に聞くのは往復が増えやすかった
+- 決定事項: `e2e/scripts/report-ubuntu-e2e.sh` と `pnpm --dir e2e run report:ubuntu` を追加し、別 server 実機ではまずこの出力を採る前提にする
+- 影響範囲: 別 Ubuntu Server 実機の切り分け開始手順、サポート時の共有情報、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run report:ubuntu` を実行し、その出力を起点に `recover:ubuntu` か `verify:ubuntu` へ進む
