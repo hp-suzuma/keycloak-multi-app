@@ -71,6 +71,7 @@ root 権限が取れるタイミングでは `pnpm --dir e2e run install:ubuntu-
 今後は `pnpm --dir e2e run doctor` の中でも Ubuntu apt source の `http/https` を確認し、新しい server で同じ詰まり方を早めに検知する。
 fresh Ubuntu Server の通し確認は `pnpm --dir e2e run verify:ubuntu` を入口にして、`doctor -> wait:stack -> test:sso:auto` をまとめて流せるようにする。
 apt source が `http` のままなら、repo 内の `pnpm --dir e2e run fix:ubuntu-apt-sources` で `https` に揃えてから先へ進む。
+さらに、apt source `http` の修正から通し確認までを一度で流す入口として `pnpm --dir e2e run recover:ubuntu` を用意する。
 
 ### `bff-b` の扱い
 

@@ -7,6 +7,7 @@
     "fix:ubuntu-apt-sources": "bash ./scripts/fix-ubuntu-apt-sources.sh",
     "install:ubuntu-libs": "bash ./scripts/install-ubuntu-playwright-libs.sh",
     "doctor": "node ./scripts/doctor.mjs",
+    "recover:ubuntu": "bash ./scripts/recover-ubuntu-e2e.sh",
     "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "verify:ubuntu": "bash ./scripts/verify-ubuntu-e2e.sh",
     "test": "playwright test",

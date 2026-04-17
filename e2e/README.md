@@ -66,6 +66,14 @@ pnpm --dir e2e run verify:ubuntu
 
 これは `doctor -> wait:stack -> test:sso:auto` を順に実行します。
 
+`doctor` が apt source の `http` を検知した時に、修正から通し確認までまとめて進めたい時は次を使います。
+
+```bash
+pnpm --dir e2e run recover:ubuntu
+```
+
+これは `doctor` を先に流し、`apt:ubuntu-sources` 失敗なら `fix:ubuntu-apt-sources -> doctor -> verify:ubuntu` の順に進みます。
+
 `doctor` は次をまとめて確認します。
 
 - `Node 22+`
@@ -127,3 +135,4 @@ pnpm --dir e2e test:headed
 - 実機で確認した不足 library は `libatk1.0-0t64`, `libatk-bridge2.0-0t64`, `libcups2t64`, `libasound2t64`, `libgbm1`, `libcairo2`, `libpango-1.0-0`, `libxcomposite1`, `libxdamage1`, `libxfixes3`, `libxrandr2`, `libatspi2.0-0t64`
 - apt source が `archive.ubuntu.com` / `security.ubuntu.com` の `http` で詰まる場合は、Ubuntu 側の `ubuntu.sources` を `https` へ変更してから `pnpm --dir e2e run install:ubuntu-libs` を再実行する
 - `fix:ubuntu-apt-sources` は `/etc/apt/sources.list.d/ubuntu.sources` を backup したうえで `archive/security` の URI を `https` に置き換える
+- `recover:ubuntu` は apt source `http` の修正だけを自動 recovery 対象にし、それ以外の `doctor` failure では停止する

@@ -380,3 +380,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/fix-ubuntu-apt-sources.sh` と `pnpm --dir e2e run fix:ubuntu-apt-sources` を追加し、`/etc/apt/sources.list.d/ubuntu.sources` の `archive/security` URI を backup つきで `https` へ置き換えられるようにした
 - 影響範囲: 新しい Ubuntu Server の apt recovery 手順、`doctor` 後の修正導線、browser 実測の再現性
 - 次の推奨アクション: 次は別の Ubuntu Server で `doctor` が apt source `http` を検知した時に `pnpm --dir e2e run fix:ubuntu-apt-sources` を実行し、その後 `verify:ubuntu` が通るかを確認する
+
+### apt source `http` の検知から修正までは `recover:ubuntu` に寄せる
+
+- 背景: `doctor` が apt source `http` を検知しても、その後に `fix -> doctor -> verify` を人手でつなぐ必要があり、fresh server で少し煩雑だった
+- 決定事項: `e2e/scripts/recover-ubuntu-e2e.sh` と `pnpm --dir e2e run recover:ubuntu` を追加し、`doctor` が `apt:ubuntu-sources` で落ちた時だけ `fix:ubuntu-apt-sources -> doctor -> verify:ubuntu` を自動でつなぐようにした。他の failure では自動 recovery せず、そのまま停止する
+- 影響範囲: 新しい Ubuntu Server の初回 recovery 導線、`doctor` failure 後の運用、browser 実測の再現性
+- 次の推奨アクション: 次は別の Ubuntu Server で apt source が `http` の状態を作り、`pnpm --dir e2e run recover:ubuntu` が `fix -> verify` まで同じ導線で通るかを確認する
