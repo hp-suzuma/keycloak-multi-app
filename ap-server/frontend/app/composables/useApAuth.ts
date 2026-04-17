@@ -148,7 +148,10 @@ const TOKEN_STORAGE_KEY = 'ap-api-bearer-token'
 
 export function useApAuth() {
   const config = useRuntimeConfig()
-  const { globalLoginUrl: buildGlobalLoginUrl } = useApSso()
+  const {
+    globalLoginUrl: buildGlobalLoginUrl,
+    globalLogoutUrl: buildGlobalLogoutUrl
+  } = useApSso()
   const modeOverride = useState<AuthMode | null>('ap-auth-mode-override', () => null)
   const tokenOverride = useState<string>('ap-auth-token-override', () => '')
   const currentUser = useState<ApCurrentUser | null>('ap-auth-current-user', () => null)
@@ -168,6 +171,7 @@ export function useApAuth() {
   const apiBase = computed(() => config.public.apApiBase)
   const bearerToken = computed(() => tokenOverride.value || config.public.apApiBearerToken)
   const globalLoginUrl = computed(() => buildGlobalLoginUrl())
+  const globalLogoutUrl = computed(() => buildGlobalLogoutUrl())
   const hasBearerToken = computed(() => bearerToken.value.length > 0)
   const isLiveReady = computed(() => mode.value === 'live' && apiBase.value.length > 0 && hasBearerToken.value)
   const effectivePermissions = computed(() => authorization.value?.permissions ?? [])
@@ -250,6 +254,15 @@ export function useApAuth() {
     persistClientState()
   }
 
+  function clearClientAuth() {
+    tokenOverride.value = ''
+    currentUser.value = null
+    authorization.value = null
+    status.value = 'idle'
+    errorMessage.value = null
+    persistClientState()
+  }
+
   async function refreshCurrentUser() {
     errorMessage.value = null
     status.value = 'loading'
@@ -314,6 +327,7 @@ export function useApAuth() {
     apiBase,
     bearerToken,
     globalLoginUrl,
+    globalLogoutUrl,
     currentUser,
     authorization,
     effectivePermissions,
@@ -326,6 +340,7 @@ export function useApAuth() {
     authRecoveryKind,
     setMode,
     setBearerToken,
+    clearClientAuth,
     refreshCurrentUser
   }
 }

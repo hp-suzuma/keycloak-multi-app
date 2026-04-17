@@ -26,7 +26,7 @@ class GlobalAuthController extends Controller
         $request->session()->put('oidc_nonce', $nonce);
         $request->session()->forget(self::POST_LOGIN_REDIRECT_KEY);
 
-        if ($returnTo = $this->validatedPostLoginRedirect($request->query('return_to'))) {
+        if ($returnTo = $this->validatedAllowedRedirect($request->query('return_to'))) {
             $request->session()->put(self::POST_LOGIN_REDIRECT_KEY, $returnTo);
         }
 
@@ -69,18 +69,20 @@ class GlobalAuthController extends Controller
     public function logout(Request $request): RedirectResponse
     {
         $idTokenHint = $request->session()->get('oidc_id_token');
+        $postLogoutRedirect = $this->validatedAllowedRedirect($request->query('return_to'))
+            ?? rtrim(config('app.url'), '/').'/';
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->away($this->oidc->logoutUrl(
-            postLogoutRedirectUri: rtrim(config('app.url'), '/').'/',
+            postLogoutRedirectUri: $postLogoutRedirect,
             idTokenHint: $idTokenHint,
             clientId: config('services.keycloak.client_id'),
         ));
     }
 
-    private function validatedPostLoginRedirect(mixed $value): ?string
+    private function validatedAllowedRedirect(mixed $value): ?string
     {
         if (! is_string($value) || trim($value) === '') {
             return null;

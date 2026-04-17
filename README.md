@@ -75,6 +75,7 @@ apt source が `http` のままなら、repo 内の `pnpm --dir e2e run fix:ubun
 さらに、apt source `http` の修正から通し確認までを一度で流す入口として `pnpm --dir e2e run recover:ubuntu` を用意する。
 別 server 実機がまだ無い段階では `pnpm --dir e2e run selfcheck:recover-ubuntu` で recovery 分岐自体を temp fixture 上で自己検証できる。
 別 server 実機で詰まった時は `pnpm --dir e2e run report:ubuntu` を流し、診断情報をまとめて採る。
+この browser 実行環境整備は、現時点では「この Ubuntu Server で `pnpm --dir e2e run test:sso:auto` と `test:sso` が通る」到達点で一区切りにする。別 server 実機向けの `triage / recover / report` は将来の運用確認用として残し、当面の本題作業は AP Frontend / Backend の実装へ戻って進めてよい。
 
 ### `bff-b` の扱い
 

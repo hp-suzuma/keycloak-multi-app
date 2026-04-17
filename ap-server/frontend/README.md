@@ -408,3 +408,17 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/triage-ubuntu-e2e.sh` と `pnpm --dir e2e run triage:ubuntu` を追加し、最初に `report:ubuntu` を採ったあと `doctor` の結果に応じて `verify:ubuntu` か `recover:ubuntu` へ自動で進む入口に寄せる
 - 影響範囲: 別 Ubuntu Server 実機の初手コマンド、診断情報の採取順序、今後の handoff
 - 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run triage:ubuntu` を実行し、そのまま `verify` か `recover` へつながるかを確認する
+
+### browser 実行環境整備はいったん区切り、AP 側の session lifecycle へ戻る
+
+- 背景: browser 実行環境の整備を続けるうちに、本題の AP Frontend 実装よりも「別 Ubuntu Server 実機での運用確認」に作業が寄り始めていた。一方、この Ubuntu Server ではすでに `pnpm --dir e2e run test:sso:auto` とローカル `pnpm --dir e2e run test:sso` が通っており、SSO recovery の実測基盤としては十分な到達点に達していた
+- 決定事項: browser 実行環境まわりは現時点で一区切りにし、別 server 実機向けの `triage / recover / report` は将来の運用確認用として残す。本題の次工程は AP Frontend / Backend の auth UX と session lifecycle 実装へ戻す
+- 影響範囲: `e2e` の今後の優先度、次チャット以降の実装対象、AP Frontend の auth handoff
+- 次の推奨アクション: 次は AP Frontend で `SSO Login` の対になる logout / session reset 導線を揃え、bridge で取得した token を明示的に手放せるようにする
+
+### AP Frontend の session 終了は `SSO Logout` と local `Reset Session` を分けて扱う
+
+- 背景: `global login -> /auth/bridge -> /auth/callback` の復帰導線は通ったが、AP Frontend 側には `SSO Login` の対になる終了導線が薄く、live mode token を localStorage に残したままになりやすかった。debug 時の token クリアと、実運用の global SSO logout は目的が違うため、同じボタンに寄せると意味が曖昧になりやすい
+- 決定事項: AP Frontend では session 終了を 2 系統に分ける。実運用向けには `global.example.com/logout?return_to=https://ap.example.com/?logged_out=1#auth-entry` を使う `SSO Logout` を用意し、押下前に AP Frontend 側の local token / current_user / authorization も clear する。debug 用には redirect を伴わない `Reset Session` を残し、token override と local auth state だけを外せるようにする
+- 影響範囲: `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、今後の logout 完了後 UX
+- 次の推奨アクション: 次は `SSO Logout` を実ブラウザで押して `logged_out=1#auth-entry` へ戻り、Auth Entry に logout 完了案内と再ログイン導線が期待どおり出るかを確認する

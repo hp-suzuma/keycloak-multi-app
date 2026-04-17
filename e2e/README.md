@@ -163,3 +163,4 @@ pnpm --dir e2e test:headed
 - `selfcheck:recover-ubuntu` は `/etc` を触らず temp fixture だけで recovery 分岐を検証する
 - `report:ubuntu` は別 server 実機で詰まった時に、そのまま貼り返せる診断出力をまとめる
 - `triage:ubuntu` は別 server 実機での最初の入口で、`report -> doctor -> verify/recover` をまとめる
+- この repo の現時点の区切りとしては、今使っている Ubuntu Server で `test:sso:auto` とローカル `test:sso` が通っていれば browser 実行環境は十分。別 server 実機向けの `triage / recover / report` は必要になった時だけ使えばよい

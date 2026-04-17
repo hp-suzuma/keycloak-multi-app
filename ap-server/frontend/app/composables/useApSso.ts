@@ -69,11 +69,27 @@ export function useApSso() {
     return new URL('/auth/callback', frontendBaseUrl.value).toString()
   }
 
+  function logoutReturnUrl() {
+    const url = new URL('/', frontendBaseUrl.value)
+    url.searchParams.set('logged_out', '1')
+    url.hash = 'auth-entry'
+
+    return url.toString()
+  }
+
   function globalLoginUrl(next = currentNextPath()) {
     const url = new URL(globalLoginBaseUrl.value)
     url.searchParams.set('return_to', bridgeUrl(next))
 
     return url.toString()
+  }
+
+  function globalLogoutUrl(returnTo = logoutReturnUrl()) {
+    const loginUrl = new URL(globalLoginBaseUrl.value)
+    const logoutUrl = new URL('/logout', loginUrl.origin)
+    logoutUrl.searchParams.set('return_to', returnTo)
+
+    return logoutUrl.toString()
   }
 
   function readStoredState(): PkceSessionState | null {
@@ -201,7 +217,9 @@ export function useApSso() {
     keycloakClientId,
     bridgeUrl,
     callbackUrl,
+    logoutReturnUrl,
     globalLoginUrl,
+    globalLogoutUrl,
     startBridgeSession,
     completeBridgeSession,
     clearStoredState

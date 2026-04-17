@@ -4,6 +4,7 @@ const {
   apiBase,
   bearerToken,
   globalLoginUrl,
+  globalLogoutUrl,
   currentUser,
   authorization,
   status,
@@ -14,14 +15,17 @@ const {
   authRecoveryKind,
   setMode,
   setBearerToken,
+  clearClientAuth,
   refreshCurrentUser
 } = useApAuth()
 
 const RECOMMENDED_AP_API_BASE = 'https://ap-backend-fpm.example.com/api'
+const route = useRoute()
 const tokenDraft = ref('')
 const isSubmitting = ref(false)
 const isRecommendedApiBase = computed(() => apiBase.value === RECOMMENDED_AP_API_BASE)
 const hasUserManagePermission = computed(() => authorization.value?.permissions.includes('user.manage') ?? false)
+const isLoggedOutRedirect = computed(() => route.query.logged_out === '1')
 const authRecoveryTitle = computed(() => {
   if (authRecoveryKind.value === 'setup') {
     return 'Session Setup'
@@ -110,6 +114,11 @@ async function refreshOnly() {
   isSubmitting.value = true
   await refreshCurrentUser()
   isSubmitting.value = false
+}
+
+async function signOutFromSso() {
+  clearClientAuth()
+  await navigateTo(globalLogoutUrl.value, { external: true })
 }
 
 onMounted(async () => {
@@ -211,7 +220,7 @@ onMounted(async () => {
           </p>
           <div
             v-if="mode === 'live'"
-            class="mt-4"
+            class="mt-4 flex flex-wrap gap-2"
           >
             <UButton
               :to="globalLoginUrl"
@@ -221,7 +230,27 @@ onMounted(async () => {
             >
               SSO Login
             </UButton>
+            <UButton
+              color="neutral"
+              variant="soft"
+              trailing-icon="i-lucide-log-out"
+              @click="signOutFromSso"
+            >
+              SSO Logout
+            </UButton>
           </div>
+        </div>
+
+        <div
+          v-if="mode === 'live' && isLoggedOutRedirect"
+          class="rounded-2xl border border-success/30 bg-success/10 p-4 dark:border-success/20"
+        >
+          <p class="text-xs uppercase tracking-[0.18em] text-muted">
+            Logout Complete
+          </p>
+          <p class="mt-2 text-sm text-toned">
+            global SSO logout が完了し、AP Frontend 側の local token もクリアしました。次に続ける時は `SSO Login` か debug 用 token 再設定を使います。
+          </p>
         </div>
 
         <div class="rounded-2xl border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40">
@@ -397,6 +426,14 @@ onMounted(async () => {
             @click="tokenDraft = ''; setBearerToken('')"
           >
             Clear Token
+          </UButton>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="soft"
+            @click="tokenDraft = ''; clearClientAuth()"
+          >
+            Reset Session
           </UButton>
         </div>
 

@@ -13,6 +13,8 @@ const {
   status,
   mode,
   globalLoginUrl,
+  globalLogoutUrl,
+  clearClientAuth,
   refreshCurrentUser
 } = useApAuth()
 
@@ -41,6 +43,13 @@ const menuItems = computed(() => [
         label: 'SSO Login',
         icon: 'i-lucide-log-in',
         to: globalLoginUrl.value
+      }, {
+        label: 'SSO Logout',
+        icon: 'i-lucide-log-out',
+        async onSelect() {
+          clearClientAuth()
+          await navigateTo(globalLogoutUrl.value, { external: true })
+        }
       }]
     : []),
   {
