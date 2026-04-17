@@ -317,3 +317,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: live 実測では `SSO Login` から `https://ap.example.com/auth/bridge?next=%2Fusers%3Fservice_scope_id%3D2%26tenant_scope_id%3D3%26keyword%3Dalice%26sort%3D-email` へ戻り、bridge HTML 上でも同じ users query を確認できた。加えて backend が `global-login,ap-frontend` の両 client audience を受け入れるようにした後は、bridge で取った token でも `GET /api/me` が `Alice A`、`GET /api/me/authorization` が `user.manage` を含む authorization を返し、AP Frontend 自然復帰の前提が live で通った
 - 影響範囲: `ap-server/frontend` の SSO recovery 実測手順、`laravel-overlay/app/Http/Controllers/GlobalAuthController.php` の rebuild 必要性、`ap-server/backend` の accepted client ids 前提、今後の users 一覧 / 詳細の live 手動確認
 - 次の推奨アクション: 次は実ブラウザで `https://ap.example.com/users?service_scope_id=2&tenant_scope_id=3&keyword=alice&sort=-email` から `SSO Login` を押し、callback 後に同じ users 画面と query のまま復帰して `Current User = Alice A` と `user.manage` が見えることを UI で確認する
+
+### browser 実測の入口は `e2e/` の Playwright doctor と SSO spec に寄せる
+
+- 背景: 次の確認作業は「Ubuntu Server へ直接入れた browser 実行環境」で AP Frontend の SSO 自然復帰を通す段階になった。ここで毎回手動で `Node` 版数、`*.example.com` の名前解決、stack 起動待ちを確認すると、Playwright 本体に入る前の前提漏れで止まりやすい
+- 決定事項: browser 実測の入口はルート `e2e/README.md` とし、まず `pnpm --dir e2e run doctor` で Node 22 / hosts / URL 疎通をまとめて確認し、その後 `pnpm --dir e2e run wait:stack` と `pnpm --dir e2e run test:sso` で AP Frontend の SSO recovery UI を流す
+- 影響範囲: Ubuntu Server 直の browser 実行手順、`ap-server/frontend` の SSO recovery 実ブラウザ確認、次チャット以降の UI 実測開始地点
+- 次の推奨アクション: 次は Ubuntu Server 上で `corepack enable` と `pnpm --dir e2e install` / `install:browsers` を済ませ、`doctor -> wait:stack -> test:sso` の順に実行して `Current User = Alice A` と `user.manage` の表示まで実ブラウザで確認する

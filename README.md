@@ -57,6 +57,9 @@ corepack enable
 corepack prepare pnpm@latest --activate
 pnpm --dir e2e install
 pnpm --dir e2e run install:browsers
+pnpm --dir e2e run doctor
+pnpm --dir e2e run wait:stack
+pnpm --dir e2e run test:sso
 ```
 
 ### `bff-b` の扱い

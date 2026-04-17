@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "doctor": "node ./scripts/doctor.mjs",
+    "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "test": "playwright test",
+    "test:sso": "playwright test tests/ap-frontend-sso-recovery.spec.ts",
     "test:headed": "playwright test --headed",
     "codegen": "playwright codegen https://ap.example.com",
     "install:browsers": "playwright install --with-deps chromium"
