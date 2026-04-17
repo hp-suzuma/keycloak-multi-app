@@ -62,6 +62,9 @@ pnpm --dir e2e run wait:stack
 pnpm --dir e2e run test:sso
 ```
 
+Ubuntu Server に browser 実行環境を初回導入する時は、`pnpm --dir e2e run bootstrap:ubuntu` を入口にする。
+このスクリプトが `nvm -> Node 22 -> corepack/pnpm -> Playwright Chromium` までまとめて整える。
+
 ### `bff-b` の扱い
 
 `bff-b` は現時点では削除しません。

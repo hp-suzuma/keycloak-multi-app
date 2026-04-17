@@ -324,3 +324,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: browser 実測の入口はルート `e2e/README.md` とし、まず `pnpm --dir e2e run doctor` で Node 22 / hosts / URL 疎通をまとめて確認し、その後 `pnpm --dir e2e run wait:stack` と `pnpm --dir e2e run test:sso` で AP Frontend の SSO recovery UI を流す
 - 影響範囲: Ubuntu Server 直の browser 実行手順、`ap-server/frontend` の SSO recovery 実ブラウザ確認、次チャット以降の UI 実測開始地点
 - 次の推奨アクション: 次は Ubuntu Server 上で `corepack enable` と `pnpm --dir e2e install` / `install:browsers` を済ませ、`doctor -> wait:stack -> test:sso` の順に実行して `Current User = Alice A` と `user.manage` の表示まで実ブラウザで確認する
+
+### Ubuntu Server 初回導入は `bootstrap:ubuntu` を入口にする
+
+- 背景: browser 実測の前提を毎回手で入れるより、Ubuntu Server 初回導入をスクリプト化した方が派生プロジェクトでも流用しやすく、Node 版数や `pnpm` 有効化の揺れも減らせる
+- 決定事項: Ubuntu Server 初回導入の入口は `pnpm --dir e2e run bootstrap:ubuntu` ではなく、Node 未導入でも動けるよう `bash e2e/scripts/bootstrap-ubuntu.sh` でも直接叩ける `e2e/scripts/bootstrap-ubuntu.sh` を正とする。Node 導入後は `doctor -> wait:stack -> test:sso` の順で AP Frontend の SSO 実測へ進む
+- 影響範囲: Ubuntu Server 直の browser 環境構築、`e2e/.env` の初期化、今後の Playwright 実測開始手順
+- 次の推奨アクション: 次は Ubuntu Server 上で `bash e2e/scripts/bootstrap-ubuntu.sh` を実行し、必要なら `e2e/.env` の認証情報を調整した上で `pnpm --dir e2e run doctor -> wait:stack -> test:sso` を流す

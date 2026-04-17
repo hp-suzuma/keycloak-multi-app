@@ -19,6 +19,23 @@ pnpm --dir e2e install
 pnpm --dir e2e run install:browsers
 ```
 
+Ubuntu Server にこれから browser 実行環境を入れる時は、次でも同じ状態に寄せられます。
+
+```bash
+pnpm --dir e2e run bootstrap:ubuntu
+```
+
+`bootstrap:ubuntu` は次をまとめて行います。
+
+- `nvm` の導入
+- `Node 22` の導入と default 化
+- `corepack + pnpm` の有効化
+- `e2e` 依存の install
+- `Playwright Chromium` と Ubuntu 依存の install
+- `e2e/.env.example` からの `.env` 雛形作成
+
+資格情報や URL を明示したい時は [e2e/.env.example](/home/wsat/projects/keycloak-multi-app/e2e/.env.example) を元に `e2e/.env` を調整します。
+
 ## 実行前チェック
 
 Ubuntu Server へ入れた直後は、まず browser 実行前提だけ先に確認します。
@@ -65,3 +82,4 @@ pnpm --dir e2e test:headed
 - `PLAYWRIGHT_BASE_URL` を変えれば別 host でも流せる
 - Keycloak の認証情報は `KEYCLOAK_USERNAME`, `KEYCLOAK_PASSWORD` で上書きできる
 - `PLAYWRIGHT_WAIT_TIMEOUT_MS`, `PLAYWRIGHT_WAIT_INTERVAL_MS` で stack 待機時間を調整できる
+- `bootstrap:ubuntu` は `curl` と `bash` が入っている Ubuntu Server を前提にしている

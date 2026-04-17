@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bootstrap:ubuntu": "bash ./scripts/bootstrap-ubuntu.sh",
     "doctor": "node ./scripts/doctor.mjs",
     "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "test": "playwright test",
