@@ -401,3 +401,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/report-ubuntu-e2e.sh` と `pnpm --dir e2e run report:ubuntu` を追加し、別 server 実機ではまずこの出力を採る前提にする
 - 影響範囲: 別 Ubuntu Server 実機の切り分け開始手順、サポート時の共有情報、今後の handoff
 - 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run report:ubuntu` を実行し、その出力を起点に `recover:ubuntu` か `verify:ubuntu` へ進む
+
+### 別 server 実機の最初の入口は `triage:ubuntu` に寄せる
+
+- 背景: 実機に入った直後は `report` を採るべきか、そのまま `verify` へ進むべきか、apt source 修正が要るのかを人が判断していた
+- 決定事項: `e2e/scripts/triage-ubuntu-e2e.sh` と `pnpm --dir e2e run triage:ubuntu` を追加し、最初に `report:ubuntu` を採ったあと `doctor` の結果に応じて `verify:ubuntu` か `recover:ubuntu` へ自動で進む入口に寄せる
+- 影響範囲: 別 Ubuntu Server 実機の初手コマンド、診断情報の採取順序、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run triage:ubuntu` を実行し、そのまま `verify` か `recover` へつながるかを確認する

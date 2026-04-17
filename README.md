@@ -70,6 +70,7 @@ root 権限が取れるタイミングでは `pnpm --dir e2e run install:ubuntu-
 この Ubuntu Server では apt source の `URIs` を `http://archive.ubuntu.com` / `http://security.ubuntu.com` から `https://...` に変更したあと、Ubuntu 直の `pnpm --dir e2e run test:sso` が pass した。
 今後は `pnpm --dir e2e run doctor` の中でも Ubuntu apt source の `http/https` を確認し、新しい server で同じ詰まり方を早めに検知する。
 fresh Ubuntu Server の通し確認は `pnpm --dir e2e run verify:ubuntu` を入口にして、`doctor -> wait:stack -> test:sso:auto` をまとめて流せるようにする。
+別 server 実機で最初に状況確認から始める時は `pnpm --dir e2e run triage:ubuntu` を入口にして、`report -> doctor -> verify/recover` をまとめて流す。
 apt source が `http` のままなら、repo 内の `pnpm --dir e2e run fix:ubuntu-apt-sources` で `https` に揃えてから先へ進む。
 さらに、apt source `http` の修正から通し確認までを一度で流す入口として `pnpm --dir e2e run recover:ubuntu` を用意する。
 別 server 実機がまだ無い段階では `pnpm --dir e2e run selfcheck:recover-ubuntu` で recovery 分岐自体を temp fixture 上で自己検証できる。

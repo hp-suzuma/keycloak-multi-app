@@ -10,6 +10,7 @@
     "report:ubuntu": "bash ./scripts/report-ubuntu-e2e.sh",
     "recover:ubuntu": "bash ./scripts/recover-ubuntu-e2e.sh",
     "selfcheck:recover-ubuntu": "bash ./scripts/selfcheck-recover-ubuntu.sh",
+    "triage:ubuntu": "bash ./scripts/triage-ubuntu-e2e.sh",
     "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "verify:ubuntu": "bash ./scripts/verify-ubuntu-e2e.sh",
     "test": "playwright test",

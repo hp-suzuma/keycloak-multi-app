@@ -66,6 +66,14 @@ pnpm --dir e2e run verify:ubuntu
 
 これは `doctor -> wait:stack -> test:sso:auto` を順に実行します。
 
+別 server 実機で最初に何を打つか迷わないよう、report 付きの入口としては次を使います。
+
+```bash
+pnpm --dir e2e run triage:ubuntu
+```
+
+これは最初に `report:ubuntu` で共有用情報を採り、その後 `doctor` の結果に応じて `verify:ubuntu` か `recover:ubuntu` へ進みます。
+
 別 server 実機で詰まった時に共有用の診断情報をまとめて採る時は、次を使います。
 
 ```bash
@@ -154,3 +162,4 @@ pnpm --dir e2e test:headed
 - `recover:ubuntu` は apt source `http` の修正だけを自動 recovery 対象にし、それ以外の `doctor` failure では停止する
 - `selfcheck:recover-ubuntu` は `/etc` を触らず temp fixture だけで recovery 分岐を検証する
 - `report:ubuntu` は別 server 実機で詰まった時に、そのまま貼り返せる診断出力をまとめる
+- `triage:ubuntu` は別 server 実機での最初の入口で、`report -> doctor -> verify/recover` をまとめる
