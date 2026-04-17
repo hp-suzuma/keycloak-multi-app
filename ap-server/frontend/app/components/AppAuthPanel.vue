@@ -19,6 +19,31 @@ const tokenDraft = ref('')
 const isSubmitting = ref(false)
 const isRecommendedApiBase = computed(() => apiBase.value === RECOMMENDED_AP_API_BASE)
 const hasUserManagePermission = computed(() => authorization.value?.permissions.includes('user.manage') ?? false)
+const liveTokenLooksInvalid = computed(() =>
+  mode.value === 'live'
+  && hasBearerToken.value
+  && status.value === 'ready'
+  && !currentUser.value
+  && !authorization.value
+)
+const scopeLabelById = computed(() => {
+  const labels = new Map<number, string>()
+
+  for (const assignment of authorization.value?.assignments ?? []) {
+    labels.set(assignment.scope.id, `${assignment.scope.name} (${assignment.scope.layer})`)
+  }
+
+  return labels
+})
+const permissionScopeEntries = computed(() =>
+  Object.entries(authorization.value?.permission_scopes ?? {}).map(([permission, scopeAccess]) => ({
+    permission,
+    grantedScopeIds: scopeAccess.granted_scope_ids,
+    accessibleScopeIds: scopeAccess.accessible_scope_ids,
+    grantedScopeLabels: scopeAccess.granted_scope_ids.map(scopeId => scopeLabelById.value.get(scopeId) ?? `scope#${scopeId}`),
+    accessibleScopeLabels: scopeAccess.accessible_scope_ids.map(scopeId => scopeLabelById.value.get(scopeId) ?? `scope#${scopeId}`)
+  }))
+)
 
 watchEffect(() => {
   tokenDraft.value = bearerToken.value
@@ -150,6 +175,77 @@ onMounted(async () => {
           </p>
           <p class="mt-2 text-xs text-muted">
             {{ hasUserManagePermission ? '`user.manage` を確認済みです。users 管理 UI の live 検証に進めます。' : '`user.manage` が見えない場合は、token を取り直してから再取得してください。' }}
+          </p>
+        </div>
+
+        <div
+          v-if="liveTokenLooksInvalid"
+          class="rounded-2xl border border-warning/30 bg-warning/10 p-4 dark:border-warning/20"
+        >
+          <p class="text-xs uppercase tracking-[0.18em] text-muted">
+            Token Check
+          </p>
+          <p class="mt-2 text-sm text-toned">
+            `GET /api/me` と `/api/me/authorization` は成功しましたが、どちらも `current_user: null` でした。
+          </p>
+          <p class="mt-2 text-xs text-muted">
+            live mode では、期限切れまたは無効な Bearer token でも Auth Entry 上は `403` ではなく `null` として見えることがあります。fresh token を取り直して `Refresh Only` で再確認してください。
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-default bg-stone-50/70 p-4 dark:bg-stone-950/40">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                Permission Scope Debug
+              </p>
+              <p class="mt-2 text-xs text-muted">
+                menu 切り替えは従来どおり `permissions` を使い、ここでは direct grant と descendant access の根拠だけを補助表示します。
+              </p>
+            </div>
+            <UBadge color="neutral" variant="soft">
+              {{ permissionScopeEntries.length }} permissions
+            </UBadge>
+          </div>
+
+          <div v-if="permissionScopeEntries.length" class="mt-4 space-y-3">
+            <div
+              v-for="entry in permissionScopeEntries"
+              :key="entry.permission"
+              class="rounded-2xl border border-default bg-white/80 p-3 dark:bg-stone-900/70"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-highlighted">
+                  {{ entry.permission }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <UBadge color="neutral" variant="soft">
+                    direct {{ entry.grantedScopeIds.length }}
+                  </UBadge>
+                  <UBadge color="primary" variant="soft">
+                    accessible {{ entry.accessibleScopeIds.length }}
+                  </UBadge>
+                </div>
+              </div>
+
+              <p class="mt-3 text-xs uppercase tracking-[0.14em] text-muted">
+                Direct Grant
+              </p>
+              <p class="mt-1 text-sm text-toned">
+                {{ entry.grantedScopeLabels.join(', ') || 'none' }}
+              </p>
+
+              <p class="mt-3 text-xs uppercase tracking-[0.14em] text-muted">
+                Accessible Scope
+              </p>
+              <p class="mt-1 text-sm text-toned">
+                {{ entry.accessibleScopeLabels.join(', ') || 'none' }}
+              </p>
+            </div>
+          </div>
+
+          <p v-else class="mt-3 text-sm text-muted">
+            `/api/me/authorization` で permission_scopes が返ると、ここに direct grant と accessible scope の差分を表示します。
           </p>
         </div>
 

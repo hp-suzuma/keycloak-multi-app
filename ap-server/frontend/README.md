@@ -240,3 +240,38 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: AP frontend では `app/layouts/dashboard.vue` を追加し、header / sidebar / footer を component 分割して共通 shell 化する。sidebar のメニューは `GET /api/me/authorization` で取れる `permissions` と assignment の layer に応じて切り替え、`/` をログイン後ホームとして使う
 - 影響範囲: `ap-server/frontend/app/layouts/dashboard.vue`、`app/components/dashboard/*`、`app/utils/dashboard.ts`、`app/pages/index.vue`、暫定 resource pages、今後のメニュー追加判断
 - 次の推奨アクション: 次は users 詳細に assignment 追加 / 削除 UI を載せつつ、dashboard shell の page header / toolbar パターンで role / scope 候補フォームをどう収めるかを決める
+
+### Auth Entry では `permission_scopes` を debug 表示し、メニュー判定は `permissions` のまま保つ
+
+- 背景: backend の認可見直しで `GET /api/me/authorization` に permission ごとの `granted_scope_ids` / `accessible_scope_ids` が追加され、frontend でも direct grant と descendant access の違いを確認できるようになった。ただし、これをすぐ menu 表示ロジックへ混ぜると、既存の dashboard shell が必要以上に複雑になりやすかった
+- 決定事項: `AppAuthPanel` に `permission_scopes` の補助表示を追加し、permission ごとの direct grant と accessible scope を debug 用に確認できるようにする。一方で sidebar や home のメニュー切り替えは引き続き `authorization.permissions` を一次判定に使い、`permission_scopes` は認可根拠の可視化に限定する
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`GET /api/me/authorization` の frontend 利用方針、dashboard shell の今後の認可表示拡張
+- 次の推奨アクション: 次に frontend の認可表示を広げるなら、users 一覧や詳細で現在選択中 scope に対して `user.manage` が direct grant なのか descendant access なのかを表示するかを検討し、必要になった時だけ `permission_scopes` の利用箇所を増やす
+
+### users 一覧と詳細では選択中 scope に対する `user.manage` の根拠だけを補助表示する
+
+- 背景: `permission_scopes` を Auth Entry だけで見せても、実際の users 操作と結び付けて見ないと「この tenant を触れるのが直付与なのか、上位からの継承なのか」が分かりづらかった。一方で、一覧や詳細で全 permission を並べ始めると画面が重くなるため、まずは users 導線で重要な `user.manage` だけに絞るのが妥当だった
+- 決定事項: users 一覧では drill-down で選択中の `activeScope`、users 詳細では assignment フォームの `selectedAssignmentScope` に対して、`user.manage` が `direct grant` / `descendant access` / `権限なし` のどれかを補助表示する。表示判定は `permission_scopes` を使うが、一覧取得やメニュー切り替えの本判定自体は変えない
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`ap-server/frontend/app/utils/permissionScopes.ts`、mock/live 両モードでの users 認可表示、今後の scope ごとの権限根拠説明
+- 次の推奨アクション: 次に進めるなら、users 一覧から詳細へ遷移した後も同じ scope 文脈で認可表示が自然に読めるかを live mode で確認し、必要なら assignment 削除確認 modal や role summary にも同じ access 表示を広げる
+
+### users 詳細の role summary と削除確認 modal でも同じ `user.manage` access 表示を使う
+
+- 背景: 選択中 scope に対する `user.manage` の根拠を一覧や assignment フォームで見せられるようになっても、実際に操作直前で見る `Role Summary` と `Remove Assignment` modal に同じ情報が無いと、画面の場所によって説明が揺れて見えやすかった
+- 決定事項: users 詳細では `Role Summary` に「この scope へ付与する操作の根拠」を、assignment 削除確認 modal に「この削除操作の根拠」を、それぞれ `direct grant` / `descendant access` / `権限なし` の same helper で表示する。users 詳細内の `user.manage` 根拠表示は同じ `permissionScopes` helper に統一する
+- 影響範囲: `ap-server/frontend/app/pages/users/[keycloakSub].vue`、assignment 追加/削除前の認可根拠表示、live mode 手動確認時に見るべき UI 要素、今後の modal / summary パターン再利用
+- 次の推奨アクション: 次は live mode で users 一覧から詳細へ入り、scope 切り替え時に一覧バッジ、assignment フォーム、role summary、削除確認 modal の `user.manage` 表示が同じ文脈で読めるかを通しで確認する
+
+### live token で確認した scope 文脈では `Service Alpha` が direct、`Tenant A` が descendant と読める
+
+- 背景: users 一覧、assignment フォーム、role summary、削除確認 modal に `user.manage` の根拠表示を増やしたあと、実データでも同じ文脈で読めるかを確認する必要があった。この環境では browser UI の自動操作手段が無かったため、同じ `alice` token と endpoint を CLI で辿って live API の事実関係を先に固めた
+- 決定事項: `alice` の fresh token で `GET /api/me/authorization` を確認すると、`user.manage` は `granted_scope_ids = [1, 2]`、`accessible_scope_ids = [1, 2, 3]` だった。つまり `AP Root` と `Service Alpha` は direct grant、`Tenant A` は descendant access と読める。さらに `GET /api/users?scope_id=2` では `tenant-user-a`、`GET /api/users?scope_id=3` では `tenant-user-b`、`GET /api/users/tenant-user-b` では `Tenant A / tenant_viewer` が返り、`GET /api/roles?scope_layer=tenant` でも tenant role 候補が揃っていたため、users 詳細で表示している access 文脈は live API と整合していると扱う
+- 影響範囲: `ap-server/frontend` の users 一覧 / 詳細の認可根拠表示、live mode 手動確認時の期待値、`Auth Entry` の `permission_scopes` debug 表示との整合、今後の token expiry 確認作業
+- 次の推奨アクション: 次に進めるなら、期限切れ token をあえて使って `GET /api/me/authorization` と `GET /api/users*` を失敗させ、Auth Entry / users 一覧 / users 詳細で `403` の案内文が期待どおりに読めるかを確認する
+
+### 期限切れ token の live 実挙動では Auth Entry は `null`、users 系は `403` になる
+
+- 背景: token expiry 時の案内文を UI で確認しようとしたところ、実際の backend 応答は endpoint によって異なっていた。README では「Auth Entry / users 画面で `403` を見る」前提になっていたが、live API を失効済み token で叩くとそのままではズレがあった
+- 決定事項: 失効済み token で `GET /api/me` と `GET /api/me/authorization` を叩くと、どちらも `200` で `current_user: null` / `authorization: null` を返す。一方、`GET /api/users*` は `403 Forbidden` を返す。これに合わせて `AppAuthPanel` では「Auth Entry 上は `403` ではなく `null` として見えることがある」案内を追加し、users 一覧 / 詳細の `403` 文言とは切り分けて扱う
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、期限切れ token 時の live mode UX、Auth Entry と users 画面のエラー理解、今後の再認証導線検討
+- 次の推奨アクション: 次に進めるなら、実運用向けの auth UX を詰める保留議題へ戻り、`401/403/null current_user` を silent login / token refresh / SSO へ戻す導線のどれで吸収するかを決める

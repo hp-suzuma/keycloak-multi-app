@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
 import { describeApApiError } from '~/utils/apApiError'
+import { resolvePermissionAccessStatus } from '~/utils/permissionScopes'
 
 definePageMeta({
   layout: 'dashboard'
 })
 
 const route = useRoute()
-const { mode, currentUser } = useApAuth()
+const { mode, currentUser, authorization } = useApAuth()
 const { listScopes, listUsers } = useApUserManagement()
 
 const serviceScopeId = computed(() => {
@@ -80,6 +81,10 @@ const usersErrorMessage = computed(() => {
 
 const selectedService = computed(() => services.value.find(scope => scope.id === serviceScopeId.value) ?? null)
 const selectedTenant = computed(() => tenants.value.find(scope => scope.id === tenantScopeId.value) ?? null)
+const activeScope = computed(() => selectedTenant.value ?? selectedService.value)
+const userManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', activeScope.value?.id)
+)
 
 const sortOptions = [
   { label: 'メールアドレス A-Z', value: 'email' },
@@ -402,12 +407,33 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
             <UBadge v-if="selectedTenant" color="primary" variant="soft">
               tenant: {{ selectedTenant.name }}
             </UBadge>
+            <UBadge
+              v-if="activeScope"
+              :color="userManageAccess.tone"
+              variant="soft"
+            >
+              user.manage: {{ userManageAccess.label }}
+            </UBadge>
             <UBadge v-if="keyword" color="warning" variant="soft">
               keyword: {{ keyword }}
             </UBadge>
             <span v-if="!selectedService && !selectedTenant && !keyword">
               条件なしの初回表示です。
             </span>
+          </div>
+
+          <div
+            v-if="activeScope"
+            class="border-b border-default/80 px-6 py-4 text-sm dark:border-default/60"
+          >
+            <p class="font-medium text-highlighted">
+              選択中 scope: {{ activeScope.name }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              `user.manage` はこの scope に対して
+              <span class="font-semibold text-toned">{{ userManageAccess.label }}</span>
+              として見えています。drill-down 先の tenant で `descendant access` と出ていれば、上位 scope の直付与から配下へ届いている状態です。
+            </p>
           </div>
 
           <div v-if="usersStatus === 'pending'" class="px-6 py-10 text-sm text-muted">

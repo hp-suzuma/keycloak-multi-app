@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PermissionRole, ScopeItem, UserAssignmentItem } from '~/composables/useApUserManagement'
 import { describeApApiError } from '~/utils/apApiError'
+import { resolvePermissionAccessStatus } from '~/utils/permissionScopes'
 
 definePageMeta({
   layout: 'dashboard'
@@ -8,7 +9,7 @@ definePageMeta({
 
 const route = useRoute()
 const keycloakSub = computed(() => String(route.params.keycloakSub))
-const { mode, currentUser } = useApAuth()
+const { mode, currentUser, authorization } = useApAuth()
 const { getUser, listScopes, listRoles, addUserAssignment, deleteUserAssignment } = useApUserManagement()
 
 const serviceScopeId = computed(() => {
@@ -130,6 +131,15 @@ watch(
 
 const selectedAssignmentScope = computed(
   () => assignmentScopeOptions.value.find(scope => scope.id === selectedAssignmentScopeId.value) ?? null
+)
+const userManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', selectedAssignmentScope.value?.id)
+)
+const selectedRoleUserManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', selectedAssignmentScope.value?.id)
+)
+const pendingRemovalUserManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', pendingRemovalAssignment.value?.scope.id)
 )
 
 const filteredAssignmentScopeOptions = computed(() => {
@@ -484,6 +494,18 @@ async function removeAssignment() {
               <p class="text-xs text-muted">
                 {{ selectedAssignmentScope ? `${selectedAssignmentScope.code} / ${selectedAssignmentScope.layer}` : 'filter 条件に一致する scope がありません。' }}
               </p>
+              <div v-if="selectedAssignmentScope" class="flex flex-wrap items-center gap-2">
+                <UBadge :color="userManageAccess.tone" variant="soft">
+                  user.manage: {{ userManageAccess.label }}
+                </UBadge>
+                <p class="text-xs text-muted">
+                  {{ userManageAccess.kind === 'direct'
+                    ? 'この scope へ直接付与された管理権限です。'
+                    : userManageAccess.kind === 'descendant'
+                      ? '上位 scope の直付与から、この scope へ継承されている管理権限です。'
+                      : 'この scope に対する user.manage は確認できません。' }}
+                </p>
+              </div>
             </label>
 
             <label class="space-y-2">
@@ -558,6 +580,13 @@ async function removeAssignment() {
                   <UBadge v-if="selectedRole" color="neutral" variant="soft">
                     {{ selectedRole.permissions.length }} permissions
                   </UBadge>
+                  <UBadge
+                    v-if="selectedRole && selectedAssignmentScope"
+                    :color="selectedRoleUserManageAccess.tone"
+                    variant="soft"
+                  >
+                    user.manage: {{ selectedRoleUserManageAccess.label }}
+                  </UBadge>
                 </div>
               </div>
 
@@ -571,6 +600,14 @@ async function removeAssignment() {
                   {{ permission.slug }}
                 </UBadge>
               </div>
+
+              <p v-if="selectedRole && selectedAssignmentScope" class="mt-3 text-xs text-muted">
+                この role を
+                <span class="font-semibold text-toned">{{ selectedAssignmentScope.name }}</span>
+                へ付与する操作は、
+                <span class="font-semibold text-toned">{{ selectedRoleUserManageAccess.label }}</span>
+                の `user.manage` を根拠にしています。
+              </p>
             </div>
           </section>
 
@@ -680,6 +717,14 @@ async function removeAssignment() {
               <p class="mt-1 text-toned">
                 {{ pendingRemovalAssignment.scope.layer }} / {{ pendingRemovalAssignment.scope.code }}
               </p>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <UBadge :color="pendingRemovalUserManageAccess.tone" variant="soft">
+                  user.manage: {{ pendingRemovalUserManageAccess.label }}
+                </UBadge>
+                <p class="text-xs text-muted">
+                  この削除操作は対象 scope に対する `user.manage` を根拠にしています。
+                </p>
+              </div>
             </div>
 
             <div class="flex justify-end gap-2">

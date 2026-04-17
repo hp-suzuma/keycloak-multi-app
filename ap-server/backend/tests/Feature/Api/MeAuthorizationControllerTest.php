@@ -35,13 +35,13 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
 
         $serverScope = Scope::query()->create([
             'layer' => 'server',
-            'code' => 'srv-1',
+            'code' => 'srv-authz-1',
             'name' => 'Server 1',
         ]);
 
         $tenantScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-a',
+            'code' => 'tenant-authz-a',
             'name' => 'Tenant A',
             'parent_scope_id' => $serverScope->id,
         ]);
@@ -81,7 +81,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                     'keycloak_sub' => 'keycloak-user-1',
                     'assignments' => [
                         [
-                            'scope' => $this->scopePayload($serverScope->id, 'server', 'srv-1', 'Server 1'),
+                            'scope' => $this->scopePayload($serverScope->id, 'server', 'srv-authz-1', 'Server 1'),
                             'role' => $this->rolePayload($serverAdminRole->id, 'server_admin', 'Server Admin', 'server', 'admin'),
                             'permissions' => $this->permissionsPayload(
                                 'object.read',
@@ -92,17 +92,39 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                             ),
                         ],
                         [
-                            'scope' => $this->scopePayload($tenantScope->id, 'tenant', 'tenant-a', 'Tenant A', $serverScope->id),
+                            'scope' => $this->scopePayload($tenantScope->id, 'tenant', 'tenant-authz-a', 'Tenant A', $serverScope->id),
                             'role' => $this->rolePayload($tenantViewerRole->id, 'tenant_viewer', 'Tenant Viewer', 'tenant', 'viewer'),
                             'permissions' => $this->permissionsPayload('object.read'),
                         ],
                     ],
                     'permissions' => [
-                        'object.read',
-                        'object.update',
                         'object.create',
                         'object.delete',
                         'object.execute',
+                        'object.read',
+                        'object.update',
+                    ],
+                    'permission_scopes' => [
+                        'object.create' => [
+                            'granted_scope_ids' => [$serverScope->id],
+                            'accessible_scope_ids' => [$serverScope->id, $tenantScope->id],
+                        ],
+                        'object.delete' => [
+                            'granted_scope_ids' => [$serverScope->id],
+                            'accessible_scope_ids' => [$serverScope->id, $tenantScope->id],
+                        ],
+                        'object.execute' => [
+                            'granted_scope_ids' => [$serverScope->id],
+                            'accessible_scope_ids' => [$serverScope->id, $tenantScope->id],
+                        ],
+                        'object.read' => [
+                            'granted_scope_ids' => [$serverScope->id, $tenantScope->id],
+                            'accessible_scope_ids' => [$serverScope->id, $tenantScope->id],
+                        ],
+                        'object.update' => [
+                            'granted_scope_ids' => [$serverScope->id],
+                            'accessible_scope_ids' => [$serverScope->id, $tenantScope->id],
+                        ],
                     ],
                 ],
             ]);
@@ -130,6 +152,7 @@ class MeAuthorizationControllerTest extends AuthorizationApiTestCase
                     'keycloak_sub' => 'keycloak-user-2',
                     'assignments' => [],
                     'permissions' => [],
+                    'permission_scopes' => [],
                 ],
             ]);
     }

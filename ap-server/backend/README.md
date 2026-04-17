@@ -1756,3 +1756,17 @@ php artisan test
 - 決定事項: frontend では `GET /api/me` と `GET /api/me/authorization` を同じ Bearer token で取得し、dashboard sidebar のメニューは `authorization.permissions` と assignment の primary scope layer を基準に組み立てる。backend 側では dashboard メニュー制御に使う前提で `permissions` 集約の表現を維持する
 - 影響範囲: `GET /api/me/authorization` の継続運用、frontend dashboard shell、今後のメニュー追加時に必要な permission 粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次は users 詳細の assignment 操作 UI を dashboard shell 上へ載せ、role / scope 候補 API で frontend が本当に必要とする filter 条件を確認する
+
+### 認可は「上位から下位への継承」を許容しつつ、実操作では対象 scope の明示を残す
+
+- 背景: 認可設計を見直す中で、server / service レイヤーに下位レイヤーを個別に表現しすぎると、1 AP あたりの service 数が少ない前提に対して過剰設計になりやすいことが分かった。一方で、上位レイヤーは下位レイヤーの管理や業務代行を担うため、`上位の権限は配下にも届く` という運用自体は維持したい
+- 決定事項: 直接付与された role / permission は、その所属 scope と descendant scope に対する scope-bound な操作に限って有効とする。つまり `上位は配下を管理できる` を基本方針にする一方、実際の作成・更新・削除・付与などの操作は、従来どおり対象 scope を明示して進める。`権限は継承してよいが、操作は必ず対象を指定して行う` を backend 認可方針の要約とする
+- 影響範囲: `AuthorizationService` の granted / accessible の役割分担、`required_permissions` middleware の使い方、users/object/playbook/policy/checklist など scope を持つ API の認可前提、frontend の drill-down UI、今後の認可仕様メモ全体
+- 次の推奨アクション: 次に実装を進めるときは、1) route 単位の `permissions` 判定だけで完結している API がないか確認する、2) scope を持つ操作は対象 scope を必ず受け取る契約に寄せる、3) `direct grant` と `descendant 由来の access` を API 表現やテストで混同していないかを点検する
+
+### `GET /api/me/authorization` は permission ごとの direct grant と descendant access を併記する
+
+- 背景: 認可方針を `上位は配下を管理できる` に寄せても、API 上で direct grant と descendant 由来の access を区別できないと、frontend の判断材料や後続テストが再び曖昧になりやすかった。既存の `assignments` と集約済み `permissions` は維持しつつ、その permission がどの scope に直接付与され、どこまで配下へ届くかを同じレスポンス内で確認できる形が必要だった
+- 決定事項: `GET /api/me/authorization` の `authorization` には既存の `assignments` と `permissions` を残したまま、permission slug ごとの `permission_scopes` を追加する。各 permission には `granted_scope_ids` と `accessible_scope_ids` を持たせ、前者は direct grant、後者は descendant を含む実効 access として扱う
+- 影響範囲: `AuthorizationService` の response 形式、`tests/Feature/Api/MeAuthorizationControllerTest.php`、今後 frontend が認可の根拠表示や drill-down 補助を足す時の参照契約、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に frontend 側へ認可根拠表示を足すなら、まずは `permission_scopes` を debug / 補助表示に限定して使い、メニュー切り替えの一次判定は引き続き `authorization.permissions` で簡潔に保つ

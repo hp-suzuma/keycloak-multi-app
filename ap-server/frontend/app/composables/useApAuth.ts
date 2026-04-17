@@ -34,10 +34,16 @@ export interface ApAssignment {
   permissions: ApPermission[]
 }
 
+export interface ApPermissionScopeAccess {
+  granted_scope_ids: number[]
+  accessible_scope_ids: number[]
+}
+
 export interface ApAuthorization {
   keycloak_sub: string
   assignments: ApAssignment[]
   permissions: string[]
+  permission_scopes: Record<string, ApPermissionScopeAccess>
 }
 
 interface MeResponse {
@@ -106,7 +112,33 @@ const MOCK_AUTHORIZATION: ApAuthorization = {
     'object.update',
     'object.delete',
     'object.execute'
-  ]
+  ],
+  permission_scopes: {
+    'user.manage': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.read': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.create': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.update': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.delete': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.execute': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    }
+  }
 }
 
 const MODE_STORAGE_KEY = 'ap-user-management-mode'
