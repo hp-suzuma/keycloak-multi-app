@@ -387,3 +387,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/recover-ubuntu-e2e.sh` と `pnpm --dir e2e run recover:ubuntu` を追加し、`doctor` が `apt:ubuntu-sources` で落ちた時だけ `fix:ubuntu-apt-sources -> doctor -> verify:ubuntu` を自動でつなぐようにした。他の failure では自動 recovery せず、そのまま停止する
 - 影響範囲: 新しい Ubuntu Server の初回 recovery 導線、`doctor` failure 後の運用、browser 実測の再現性
 - 次の推奨アクション: 次は別の Ubuntu Server で apt source が `http` の状態を作り、`pnpm --dir e2e run recover:ubuntu` が `fix -> verify` まで同じ導線で通るかを確認する
+
+### recovery 分岐の自己検証は temp fixture で回せるようにする
+
+- 背景: 実際の別 Ubuntu Server が無い状態だと、`recover:ubuntu` の `apt:ubuntu-sources` 分岐そのものを手元で検証しづらかった
+- 決定事項: `doctor` には `E2E_UBUNTU_SOURCE_FILES`、`fix-ubuntu-apt-sources` には `E2E_UBUNTU_SOURCE_TARGET` の override 口を追加し、`e2e/scripts/selfcheck-recover-ubuntu.sh` と `pnpm --dir e2e run selfcheck:recover-ubuntu` で temp の `ubuntu.sources` fixture を `http` から `https` へ直せるかを自己検証できるようにした
+- 影響範囲: recovery 分岐のローカル検証、別 server 実機が無い段階での回帰確認、`doctor/fix/recover` のテスト容易性
+- 次の推奨アクション: 次は `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp fixture 上で `recover:ubuntu` の修正分岐が通ることを確認する

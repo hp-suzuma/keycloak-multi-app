@@ -2,8 +2,17 @@
 
 set -euo pipefail
 
-target="/etc/apt/sources.list.d/ubuntu.sources"
+target="${E2E_UBUNTU_SOURCE_TARGET:-/etc/apt/sources.list.d/ubuntu.sources}"
 backup="${target}.bak"
+
+run_maybe_sudo() {
+  if [ -w "$target" ] || [ ! -e "$target" ]; then
+    "$@"
+    return
+  fi
+
+  sudo "$@"
+}
 
 if [ ! -f "$target" ]; then
   echo "[e2e] ${target} was not found."
@@ -12,10 +21,10 @@ if [ ! -f "$target" ]; then
 fi
 
 echo "[e2e] backing up ${target} to ${backup}"
-sudo cp "$target" "$backup"
+run_maybe_sudo cp "$target" "$backup"
 
 echo "[e2e] switching Ubuntu archive/security URIs to https"
-sudo sed -i \
+run_maybe_sudo sed -i \
   -e 's|http://archive.ubuntu.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|g' \
   -e 's|http://security.ubuntu.com/ubuntu/|https://security.ubuntu.com/ubuntu/|g' \
   "$target"

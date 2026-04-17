@@ -8,6 +8,7 @@
     "install:ubuntu-libs": "bash ./scripts/install-ubuntu-playwright-libs.sh",
     "doctor": "node ./scripts/doctor.mjs",
     "recover:ubuntu": "bash ./scripts/recover-ubuntu-e2e.sh",
+    "selfcheck:recover-ubuntu": "bash ./scripts/selfcheck-recover-ubuntu.sh",
     "wait:stack": "node ./scripts/wait-for-stack.mjs",
     "verify:ubuntu": "bash ./scripts/verify-ubuntu-e2e.sh",
     "test": "playwright test",

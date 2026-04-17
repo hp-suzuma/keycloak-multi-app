@@ -74,6 +74,14 @@ pnpm --dir e2e run recover:ubuntu
 
 これは `doctor` を先に流し、`apt:ubuntu-sources` 失敗なら `fix:ubuntu-apt-sources -> doctor -> verify:ubuntu` の順に進みます。
 
+別 server がまだ無い段階で recovery 分岐そのものを確認したい時は、次を使います。
+
+```bash
+pnpm --dir e2e run selfcheck:recover-ubuntu
+```
+
+これは temp の `ubuntu.sources` fixture を `http` で作り、`recover:ubuntu` が `https` へ書き換えて通し確認まで進むかをローカルで検証します。
+
 `doctor` は次をまとめて確認します。
 
 - `Node 22+`
@@ -136,3 +144,4 @@ pnpm --dir e2e test:headed
 - apt source が `archive.ubuntu.com` / `security.ubuntu.com` の `http` で詰まる場合は、Ubuntu 側の `ubuntu.sources` を `https` へ変更してから `pnpm --dir e2e run install:ubuntu-libs` を再実行する
 - `fix:ubuntu-apt-sources` は `/etc/apt/sources.list.d/ubuntu.sources` を backup したうえで `archive/security` の URI を `https` に置き換える
 - `recover:ubuntu` は apt source `http` の修正だけを自動 recovery 対象にし、それ以外の `doctor` failure では停止する
+- `selfcheck:recover-ubuntu` は `/etc` を触らず temp fixture だけで recovery 分岐を検証する

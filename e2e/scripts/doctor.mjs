@@ -28,10 +28,14 @@ const requiredUrls = [
   'https://keycloak.example.com/realms/myapp/.well-known/openid-configuration'
 ]
 
-const ubuntuSourceFiles = [
-  '/etc/apt/sources.list.d/ubuntu.sources',
-  '/etc/apt/sources.list'
-]
+const ubuntuSourceFiles = (
+  process.env.E2E_UBUNTU_SOURCE_FILES
+    ? process.env.E2E_UBUNTU_SOURCE_FILES.split(':').map((entry) => entry.trim()).filter(Boolean)
+    : [
+        '/etc/apt/sources.list.d/ubuntu.sources',
+        '/etc/apt/sources.list'
+      ]
+)
 
 function checkNodeVersion() {
   const major = Number.parseInt(process.versions.node.split('.')[0] ?? '', 10)
@@ -236,6 +240,7 @@ if (!aptSourceCheck.ok) {
 console.log(`[info] keycloak test user: ${username}`)
 console.log(`[info] keycloak password source: ${process.env.KEYCLOAK_PASSWORD ? 'env' : 'default value "password"'}`)
 console.log(`[info] host mapping source: ${process.env.PLAYWRIGHT_HOST_MAP ? 'env' : 'default PLAYWRIGHT_HOST_MAP'}`)
+console.log(`[info] ubuntu source files: ${ubuntuSourceFiles.join(', ')}`)
 console.log('[info] next command: pnpm --dir e2e run wait:stack && pnpm --dir e2e run test:sso')
 
 if (failures.length > 0) {
