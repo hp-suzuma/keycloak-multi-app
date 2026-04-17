@@ -269,6 +269,9 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
                 Auth Entry Debug
               </UButton>
             </div>
+            <p class="mt-3 text-xs text-muted">
+              `SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻ります。live session を手放してから切り分け直したい時はこちらを使います。
+            </p>
           </div>
         </UCard>
 

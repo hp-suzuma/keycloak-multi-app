@@ -441,6 +441,9 @@ async function removeAssignment() {
               Auth Entry Debug
             </UButton>
           </div>
+          <p class="mt-3 text-xs text-muted">
+            `SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻ります。users 詳細で session を閉じてから再確認したい時はこちらを使います。
+          </p>
         </div>
       </UCard>
 

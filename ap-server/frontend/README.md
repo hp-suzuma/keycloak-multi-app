@@ -429,3 +429,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `global.example.com/logout` は Keycloak へ直接 AP URL を渡さず、いったん `global.example.com/logout/callback?return_to=...` を post logout redirect に使う。callback から `ap.example.com/?logged_out=1#auth-entry` へ server-side redirect し、Playwright 実測でも `SSO Logout -> Logout Complete -> Bearer Token: missing` まで確認できた
 - 影響範囲: `laravel-overlay/routes/web.php`、`laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/README.md`、AP Frontend の logout 完了後 UX、今後の logout 回帰確認
 - 次の推奨アクション: 次は logout 後の dashboard home だけでなく、users 一覧や users 詳細からでも同じ `SSO Logout` 導線が自然に見つかるかを確認し、必要なら users 画面の recovery 文言にも logout 後の戻り先を補足する
+
+### users 一覧 / 詳細の recovery 文言にも logout 後の戻り先を補足する
+
+- 背景: `SSO Logout` 自体は dashboard header menu に置いてあったが、users 一覧や users 詳細で再認証案内だけを読むと「logout した時はどこへ戻るのか」が分かりにくかった。session をいったん閉じてから切り分け直す導線は users 画面上でも説明が揃っている方が迷いにくい
+- 決定事項: users 一覧 / 詳細の `Re-auth Flow` に「`SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻る」案内を追加した。Playwright 実測でも users 一覧で `SSO Logout` menu item が見つかり、そのまま users 詳細へ進んだ後も同じ menu item が見つかることを確認してから logout を実行している
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 画面の auth recovery 文言、今後の logout discoverability 確認
+- 次の推奨アクション: 次は users 詳細で logout 後に戻った Auth Entry から再ログインし、元の users 文脈へ戻り直す導線まで 1 本の browser シナリオとして確認する
