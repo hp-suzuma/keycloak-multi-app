@@ -7,7 +7,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apApiBase: '',
+      apApiBase: 'https://ap-backend-fpm.example.com/api',
       apApiBearerToken: '',
       apUserManagementMode: 'mock'
     }

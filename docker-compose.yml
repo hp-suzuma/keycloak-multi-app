@@ -199,6 +199,12 @@ services:
     volumes:
       - ./ap-server/frontend:/app
       - ap-frontend-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     tty: true
     stdin_open: true
     networks:
@@ -208,11 +214,47 @@ services:
     build:
       context: .
       dockerfile: docker/ap-backend/Dockerfile
+    env_file:
+      - ./docker/env/laravel.common.env
+      - ./docker/env/ap-backend.env
     working_dir: /var/www/app
     user: "1000:1000"
     volumes:
       - ./ap-server/backend:/var/www/app
       - ap-backend-composer-cache:/tmp/composer-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+    ports:
+      - "8000:8000"
+    tty: true
+    stdin_open: true
+    networks:
+      - internal
+
+  ap-backend-fpm:
+    build:
+      context: .
+      dockerfile: docker/ap-backend/Dockerfile
+    entrypoint:
+      - /usr/local/bin/init-laravel-fpm-app
+    env_file:
+      - ./docker/env/laravel.common.env
+      - ./docker/env/ap-backend.env
+    working_dir: /var/www/app
+    user: "1000:1000"
+    volumes:
+      - ./ap-server/backend:/var/www/app
+      - ap-backend-composer-cache:/tmp/composer-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
       COMPOSER_CACHE_DIR: /tmp/composer-cache
     tty: true

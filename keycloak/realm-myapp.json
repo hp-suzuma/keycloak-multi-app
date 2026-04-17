@@ -25,7 +25,7 @@
         "https://global.example.com"
       ],
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": true
     },
     {
       "clientId": "app-a",

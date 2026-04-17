@@ -2,4 +2,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-CMD ["tail", "-f", "/dev/null"]
+COPY docker/ap-frontend/init-ap-frontend.sh /usr/local/bin/init-ap-frontend
+
+RUN chmod +x /usr/local/bin/init-ap-frontend
+
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/init-ap-frontend"]

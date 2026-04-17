@@ -207,6 +207,30 @@ Keycloak Bearer トークン認証済みの場合の返却例:
 }
 ```
 
+### 開発用 token 取得前提
+
+- live mode の手動確認では `global-login` client の Bearer token を `Auth Entry` へ直接貼る運用を採る
+- ローカル開発では `keycloak/realm-myapp.json` の `global-login` に対して `directAccessGrantsEnabled: true` を有効にし、`alice / password` から password grant で `access_token` を取得できるようにする
+- 取得例:
+
+```bash
+curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=password' \
+  --data-urlencode 'client_id=global-login' \
+  --data-urlencode 'client_secret=global-secret' \
+  --data-urlencode 'username=alice' \
+  --data-urlencode 'password=password'
+```
+
+- `ap-backend` は `KEYCLOAK_CLIENT_ID=global-login` を既定とするので、`access_token` の `aud` / `azp` もこの client に合わせる
+
+### AP Frontend host を使う live mode では backend CORS に `ap.example.com` が必要
+
+- `ap-server/frontend` を `https://ap.example.com` で公開した後、browser から `https://ap-backend-fpm.example.com/api/*` を直接叩く live mode では `CORS_ALLOWED_ORIGINS` に `https://ap.example.com` を含める必要がある
+- backend 側の CORS 設定は `config/cors.php` を repo に置き、`docker/env/laravel.common.env` の `CORS_ALLOWED_ORIGINS` をそのまま読む形に固定する
+- `ap.example.com` を追加した後は `docker compose up -d --force-recreate ap-backend ap-backend-fpm` で env を反映する
+
 ### `GET /api/users`
 
 AP 側ユーザー管理の一覧 endpoint です。route では `required_permissions:user.manage` を必須にし、service では `AuthorizationService::accessibleScopeIds(..., ['user.manage'])` で確定した管理可能 scope 配下に assignment を持つユーザーだけを返します。つまり、システムユーザーは配下 service / tenant を含む管理対象、サービスユーザーは配下 tenant を含む管理対象、テナントユーザーは所属 tenant のユーザー一覧を表示する前提です。`scope_id`, `keycloak_sub`, `keyword`, `sort`, `page`, `per_page` を受け付け、`keyword` は `display_name` / `email` を横断して曖昧検索します。初期 sort は `email` の昇順です。assignment と集約 `permissions` も同じ scope 範囲に限定して返します。
@@ -871,6 +895,8 @@ Route::get('/objects', ObjectIndexController::class)
 docker compose up -d ap-backend
 ```
 
+live mode 検証で frontend から `http://localhost:8000/api` を叩く前提では、`ap-backend` は `docker/env/laravel.common.env` と `docker/env/ap-backend.env` を読み、host の `8000` 番を公開する。`ap-server/backend/.env` はローカル scaffold 用として残っていても、compose 経由で起動した `ap-backend` では container env を正として扱う。
+
 コンテナへ入る:
 
 ```bash
@@ -890,6 +916,24 @@ composer install
 ```bash
 php artisan serve --host=0.0.0.0 --port=8000
 ```
+
+live mode 初回セットアップ:
+
+```bash
+docker compose exec postgres psql -U myapp -d postgres -c "CREATE DATABASE ap_server"
+docker compose exec ap-backend php artisan migrate --seed
+docker compose exec ap-backend php artisan db:seed --class=ApUserManagementDemoSeeder --force
+```
+
+補足:
+
+- `CREATE DATABASE ap_server` は初回だけ必要。既に存在する場合は skip してよい
+- `ap-backend` image は `docker/laravel/init-laravel-app.sh` を entrypoint に使う。`docker compose up -d --build ap-backend` 後は container restart ごとに live env を `.env` へ反映し、`php artisan serve --host=0.0.0.0 --port=8000` まで自動で立ち上がる
+- `docker/env/ap-backend.env` の `KEYCLOAK_CLIENT_ID` は既定で `global-login` を指す。`app-a` / `app-b` の token で検証する場合はここを合わせる
+- `docker/env/ap-backend.env` の `KEYCLOAK_JWKS_URL` は container 内到達性を優先して `http://keycloak:8080/.../certs` を使う。`iss` は引き続き `https://keycloak.example.com/realms/myapp` を維持する
+- `KEYCLOAK_JWKS_URL` を空にした場合でも、live compose では `KEYCLOAK_INTERNAL_BASE_URL` があればそこから `/protocol/openid-connect/certs` を優先して組み立てる。discovery が connection error になっても 500 ではなく次の fallback へ進む
+- `php artisan migrate --seed` では `AuthorizationSeeder` が走り、roles / permissions の初期候補が入る。users / scopes / assignments の live 実測に必要なデータは次段で別途投入する
+- `php artisan db:seed --class=ApUserManagementDemoSeeder --force` は live mode の最小確認用に `tenant-user-a` を `server_user_manager`、`tenant-user-b` を `tenant_viewer` として投入する
 
 テスト実行:
 
@@ -956,6 +1000,34 @@ php artisan test
   - ユーザーへのロール付与
   - `id`, `keycloak_sub`, `role_id`, `scope_id`
   - どのスコープに対してどのロールを持つかを保持する
+
+### ap-backend live 起動は image entrypoint で固定する
+
+- 背景: `docker/env/ap-backend.env` を追加しても、`docker/ap-backend/Dockerfile` が `tail -f /dev/null` のままだと container restart 後に `php artisan serve` が消え、host `8000` 公開だけ残って live 実測が不安定だった
+- 決定事項: `docker/ap-backend/Dockerfile` は shared Laravel と同じ `docker/laravel/init-laravel-app.sh` を entrypoint に使い、restart ごとに `.env` へ live env を反映して `php artisan serve --host=0.0.0.0 --port=8000` を自動起動する。live 初回セットアップは `CREATE DATABASE ap_server`、`php artisan migrate --seed`、`php artisan db:seed --class=ApUserManagementDemoSeeder --force` までで揃える
+- 影響範囲: `docker/ap-backend/Dockerfile`、`docker-compose.yml`、`docker/env/ap-backend.env`、ap-backend の再起動手順、frontend live mode の前提
+- 次の推奨アクション: 次はこの entrypoint 前提で `docker compose up -d --build ap-backend` を共通起点にし、host 公開 `8000` 経由で `GET /api/me` が token を拾えない理由を `php artisan serve` 経路に絞って調べる
+
+### Keycloak JWKS 解決は internal base url を優先し、network fail では 500 にしない
+
+- 背景: live token を `/api/me` へ流したとき、`KEYCLOAK_JWKS_URL` が live env にある前提でも request 実行中に issuer discovery へ落ち、`https://keycloak.example.com/.../.well-known/openid-configuration` の connection error で 500 になる経路が残っていた
+- 決定事項: `KeycloakJwksPublicKeyResolver` は `services.keycloak.jwks_url` を最優先にし、未設定時は `services.keycloak.internal_base_url + /protocol/openid-connect/certs` を次優先に使う。JWKS 取得と discovery は `ConnectionException` を握り潰して `null` を返し、次の fallback へ進む。`MeControllerTest` には `AUTHORIZATION`、`HTTP_X_FORWARDED_AUTHORIZATION`、`access_token` query、internal base url、discovery connection failure の coverage を追加する
+- 影響範囲: `app/Services/Auth/KeycloakJwksPublicKeyResolver.php`、`app/Services/Auth/CurrentUserResolver.php`、`config/services.php`、`tests/Feature/Api/MeControllerTest.php`
+- 次の推奨アクション: 次は host から `http://127.0.0.1:8000/api/*` を叩いたときに `Authorization` / query token が `php artisan serve` request へ見えていない点を切り分け、必要なら live 検証専用に nginx 経由へ切り替える
+
+### nginx proxy で `ap-backend:8000` を挟んでも live auth は変わらない
+
+- 背景: `php artisan serve` 直叩きだけが問題なのかを確かめるため、nginx に `global.example.com/ap-api/* -> ap-backend:8000/api/*` の proxy を追加し、`Authorization` と `X-Forwarded-Authorization` をそのまま流した
+- 決定事項: `GET /ap-api/health` は成功したが、`GET /ap-api/me` と `GET /ap-api/me/authorization` は direct `http://127.0.0.1:8000/api/*` と同じく `current_user: null` だった。よって reverse proxy の有無ではなく、`php artisan serve` を含む現行実行経路全体を外した比較が必要と判断し、`ap-backend` image は `php:8.3-fpm` ベースへ寄せ、`/usr/local/bin/init-laravel-fpm-app` と compose service `ap-backend-fpm`、nginx host `ap-backend-fpm.example.com` を追加する方針にした
+- 影響範囲: `nginx/conf.d/default.conf`、`docker-compose.yml`、`docker/ap-backend/Dockerfile`、`docker/laravel/init-laravel-fpm-app.sh`、次回の live auth 比較経路
+- 次の推奨アクション: 次は `docker compose up -d --build ap-backend ap-backend-fpm nginx` を完了させ、`https://ap-backend.example.com/api/me` と `https://ap-backend-fpm.example.com/api/me` を同じ token で比較して FastCGI 経路だけで解決するかを確認する
+
+### live auth の差分比較では token expiry を先に除外する
+
+- 背景: `ap-backend` と `ap-backend-fpm` の比較中に `current_user: null` が再発したが、後で確認すると比較に使っていた `alice` token がすでに期限切れで、resolver を tinker で直叩きしても `null` になる状態だった。HTTP 経路の差に見えていたものが token expiry の影響だった
+- 決定事項: live auth 比較では、まず fresh token を取り直して `KeycloakTokenCurrentUserResolver::resolveFromBearerToken()` が `tenant-user-a` を返すことを確認してから HTTP endpoint を比較する。fresh token では direct `http://127.0.0.1:8000/api/*`、`https://ap-backend.example.com/api/*`、`https://ap-backend-fpm.example.com/api/*` の 3 経路すべてで `GET /api/me` と `GET /api/me/authorization` が成功した
+- 影響範囲: live token 比較手順、`ap-backend` / `ap-backend-fpm` の切り分け結果、backend README の検証前提、frontend live mode の API base 候補
+- 次の推奨アクション: 次は `https://ap-backend-fpm.example.com/api` を frontend live mode の実利用先として users 一覧 / 詳細 / assignment UI を画面で通し、必要なら CORS や cookie ではなく Bearer token 前提の運用メモを追加する
 
 ### required permissions ベースの API 認可入口
 

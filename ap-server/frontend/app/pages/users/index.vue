@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
+import { describeApApiError } from '~/utils/apApiError'
 
 definePageMeta({
   layout: 'dashboard'
@@ -69,6 +70,13 @@ const services = computed(() => servicesData.value?.data ?? [])
 const tenants = computed(() => tenantsData.value?.data ?? [])
 const users = computed(() => usersData.value?.data ?? [])
 const usersMeta = computed(() => usersData.value?.meta)
+const usersErrorMessage = computed(() => {
+  if (!usersError.value) {
+    return null
+  }
+
+  return describeApApiError(usersError.value, 'users 一覧の取得に失敗しました。')
+})
 
 const selectedService = computed(() => services.value.find(scope => scope.id === serviceScopeId.value) ?? null)
 const selectedTenant = computed(() => tenants.value.find(scope => scope.id === tenantScopeId.value) ?? null)
@@ -183,6 +191,22 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
 
           <p class="text-sm leading-6 text-toned">
             認証受け口がまだ無い間は mock を既定にし、backend 接続を試す時だけ live へ切り替える構成です。
+          </p>
+        </UCard>
+
+        <UCard v-if="mode === 'live'" class="border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20">
+          <template #header>
+            <div class="flex items-center gap-2 text-sm font-semibold">
+              <UIcon name="i-lucide-badge-alert" class="text-amber-600" />
+              Live Check
+            </div>
+          </template>
+
+          <p class="text-sm leading-6 text-toned">
+            live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。一覧取得で `Forbidden` や `CurrentUser 未取得` に見える時は、まず Auth Entry で fresh token を入れ直してから再試行してください。
+          </p>
+          <p class="mt-2 text-xs leading-5 text-muted">
+            正常系では Auth Entry の `Current User` が `Alice A` になり、`user.manage` を持った状態でこの一覧が開きます。
           </p>
         </UCard>
 
@@ -390,8 +414,8 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
             users 一覧を読み込み中です。
           </div>
 
-          <div v-else-if="usersError" class="px-6 py-10 text-sm text-error">
-            users 一覧の取得に失敗しました。live mode の場合は Bearer token と backend URL を確認してください。
+          <div v-else-if="usersErrorMessage" class="px-6 py-10 text-sm text-error">
+            {{ usersErrorMessage }}
           </div>
 
           <div v-else-if="users.length === 0" class="px-6 py-10 text-sm text-muted">

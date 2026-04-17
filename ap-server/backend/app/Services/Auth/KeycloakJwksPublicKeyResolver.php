@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -45,7 +46,11 @@ class KeycloakJwksPublicKeyResolver
         $cacheKey = 'keycloak.jwks.'.sha1($jwksUrl);
 
         return Cache::remember($cacheKey, now()->addSeconds(max($ttl, 1)), function () use ($jwksUrl): ?array {
-            $response = Http::acceptJson()->timeout(5)->get($jwksUrl);
+            try {
+                $response = Http::acceptJson()->timeout(5)->get($jwksUrl);
+            } catch (ConnectionException) {
+                return null;
+            }
 
             if (! $response->successful()) {
                 return null;
@@ -63,6 +68,12 @@ class KeycloakJwksPublicKeyResolver
 
         if (is_string($configuredUrl) && $configuredUrl !== '') {
             return $configuredUrl;
+        }
+
+        $internalBaseUrl = config('services.keycloak.internal_base_url');
+
+        if (is_string($internalBaseUrl) && $internalBaseUrl !== '') {
+            return rtrim($internalBaseUrl, '/').'/protocol/openid-connect/certs';
         }
 
         $discoveredUrl = $this->discoverJwksUrl();
@@ -93,7 +104,11 @@ class KeycloakJwksPublicKeyResolver
         $ttl = (int) config('services.keycloak.discovery_cache_ttl', 300);
 
         return Cache::remember($cacheKey, now()->addSeconds(max($ttl, 1)), function () use ($discoveryUrl): ?string {
-            $response = Http::acceptJson()->timeout(5)->get($discoveryUrl);
+            try {
+                $response = Http::acceptJson()->timeout(5)->get($discoveryUrl);
+            } catch (ConnectionException) {
+                return null;
+            }
 
             if (! $response->successful()) {
                 return null;

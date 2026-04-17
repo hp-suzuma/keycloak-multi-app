@@ -1,3 +1,5 @@
+import { describeApApiError } from '~/utils/apApiError'
+
 export interface ApCurrentUser {
   id: string | number
   name: string
@@ -45,6 +47,19 @@ interface MeResponse {
 interface MeAuthorizationResponse {
   current_user: ApCurrentUser | null
   authorization: ApAuthorization | null
+}
+
+function withAuthorizationHeaders(token: string) {
+  return {
+    Authorization: `Bearer ${token}`,
+    'X-Forwarded-Authorization': `Bearer ${token}`
+  }
+}
+
+function withAuthorizationQuery(token: string) {
+  return {
+    access_token: token
+  }
 }
 
 type AuthMode = 'mock' | 'live'
@@ -196,15 +211,13 @@ export function useApAuth() {
       const [meResponse, authorizationResponse] = await Promise.all([
         $fetch<MeResponse>('/me', {
           baseURL: apiBase.value,
-          headers: {
-            Authorization: `Bearer ${bearerToken.value}`
-          }
+          headers: withAuthorizationHeaders(bearerToken.value),
+          query: withAuthorizationQuery(bearerToken.value)
         }),
         $fetch<MeAuthorizationResponse>('/me/authorization', {
           baseURL: apiBase.value,
-          headers: {
-            Authorization: `Bearer ${bearerToken.value}`
-          }
+          headers: withAuthorizationHeaders(bearerToken.value),
+          query: withAuthorizationQuery(bearerToken.value)
         })
       ])
 
@@ -217,7 +230,7 @@ export function useApAuth() {
       currentUser.value = null
       authorization.value = null
       status.value = 'error'
-      errorMessage.value = error instanceof Error ? error.message : 'CurrentUser の取得に失敗しました。'
+      errorMessage.value = describeApApiError(error, 'CurrentUser の取得に失敗しました。')
       return null
     }
   }

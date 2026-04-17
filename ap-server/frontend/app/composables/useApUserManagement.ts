@@ -1,5 +1,5 @@
-type ScopeLayer = 'server' | 'service' | 'tenant'
-type PermissionRole = 'admin' | 'operator' | 'viewer' | 'user_manager'
+export type ScopeLayer = 'server' | 'service' | 'tenant'
+export type PermissionRole = 'admin' | 'operator' | 'viewer' | 'user_manager'
 
 export interface ScopeItem {
   id: number
@@ -21,6 +21,7 @@ export interface RoleItem {
   name: string
   scope_layer: ScopeLayer
   permission_role: PermissionRole
+  permissions: PermissionItem[]
 }
 
 export interface UserAssignmentItem {
@@ -79,6 +80,23 @@ export interface ScopeIndexResponse {
   data: ScopeItem[]
 }
 
+export interface RoleIndexFilters {
+  scope_layer?: ScopeLayer
+  permission_role?: PermissionRole
+  slug?: string
+  name?: string
+  sort?: string
+}
+
+export interface RoleIndexResponse {
+  data: RoleItem[]
+}
+
+export interface UserAssignmentMutationInput {
+  scope_id: number
+  role_id: number
+}
+
 const rootScope: ScopeItem = { id: 1, layer: 'server', code: 'ap-root', name: 'AP Root', parent_scope_id: null }
 const serviceAlphaScope: ScopeItem = { id: 11, layer: 'service', code: 'svc-alpha', name: 'Service Alpha', parent_scope_id: 1 }
 const serviceBetaScope: ScopeItem = { id: 12, layer: 'service', code: 'svc-beta', name: 'Service Beta', parent_scope_id: 1 }
@@ -95,12 +113,18 @@ const mockScopes: ScopeItem[] = [
   tenantCScope
 ]
 
+const userManagePermission: PermissionItem = { id: 1, slug: 'user.manage', name: 'User Manage' }
+const objectReadPermission: PermissionItem = { id: 2, slug: 'object.read', name: 'Object Read' }
+const objectUpdatePermission: PermissionItem = { id: 3, slug: 'object.update', name: 'Object Update' }
+const objectExecutePermission: PermissionItem = { id: 4, slug: 'object.execute', name: 'Object Execute' }
+
 const serviceAdminRole: RoleItem = {
   id: 1,
   slug: 'service_admin',
   name: 'Service Admin',
   scope_layer: 'service',
-  permission_role: 'admin'
+  permission_role: 'admin',
+  permissions: [userManagePermission, objectReadPermission, objectUpdatePermission, objectExecutePermission]
 }
 
 const serviceUserManagerRole: RoleItem = {
@@ -108,7 +132,8 @@ const serviceUserManagerRole: RoleItem = {
   slug: 'service_user_manager',
   name: 'Service User Manager',
   scope_layer: 'service',
-  permission_role: 'user_manager'
+  permission_role: 'user_manager',
+  permissions: [userManagePermission]
 }
 
 const tenantViewerRole: RoleItem = {
@@ -116,7 +141,8 @@ const tenantViewerRole: RoleItem = {
   slug: 'tenant_viewer',
   name: 'Tenant Viewer',
   scope_layer: 'tenant',
-  permission_role: 'viewer'
+  permission_role: 'viewer',
+  permissions: [objectReadPermission]
 }
 
 const tenantOperatorRole: RoleItem = {
@@ -124,7 +150,8 @@ const tenantOperatorRole: RoleItem = {
   slug: 'tenant_operator',
   name: 'Tenant Operator',
   scope_layer: 'tenant',
-  permission_role: 'operator'
+  permission_role: 'operator',
+  permissions: [objectReadPermission, objectUpdatePermission, objectExecutePermission]
 }
 
 const tenantUserManagerRole: RoleItem = {
@@ -132,13 +159,17 @@ const tenantUserManagerRole: RoleItem = {
   slug: 'tenant_user_manager',
   name: 'Tenant User Manager',
   scope_layer: 'tenant',
-  permission_role: 'user_manager'
+  permission_role: 'user_manager',
+  permissions: [userManagePermission]
 }
 
-const userManagePermission: PermissionItem = { id: 1, slug: 'user.manage', name: 'User Manage' }
-const objectReadPermission: PermissionItem = { id: 2, slug: 'object.read', name: 'Object Read' }
-const objectUpdatePermission: PermissionItem = { id: 3, slug: 'object.update', name: 'Object Update' }
-const objectExecutePermission: PermissionItem = { id: 4, slug: 'object.execute', name: 'Object Execute' }
+const mockRoles: RoleItem[] = [
+  serviceAdminRole,
+  serviceUserManagerRole,
+  tenantViewerRole,
+  tenantOperatorRole,
+  tenantUserManagerRole
+]
 
 const mockUsers: UserItem[] = [
   {
@@ -252,6 +283,32 @@ function filterMockScopes(filters: ScopeIndexFilters = {}): ScopeIndexResponse {
   }
 }
 
+function filterMockRoles(filters: RoleIndexFilters = {}): RoleIndexResponse {
+  let roles = [...mockRoles]
+
+  if (filters.scope_layer) {
+    roles = roles.filter(role => role.scope_layer === filters.scope_layer)
+  }
+
+  if (filters.permission_role) {
+    roles = roles.filter(role => role.permission_role === filters.permission_role)
+  }
+
+  if (filters.slug) {
+    const keyword = filters.slug.toLowerCase()
+    roles = roles.filter(role => role.slug.toLowerCase().includes(keyword))
+  }
+
+  if (filters.name) {
+    const keyword = filters.name.toLowerCase()
+    roles = roles.filter(role => role.name.toLowerCase().includes(keyword))
+  }
+
+  return {
+    data: sortItems(roles, filters.sort, 'name')
+  }
+}
+
 function matchesScope(user: UserItem, scopeId?: number): boolean {
   if (!scopeId) {
     return true
@@ -322,13 +379,109 @@ function getMockUser(keycloakSub: string): UserShowResponse {
   return { data: user }
 }
 
+function rebuildUserPermissions(user: UserItem): UserItem {
+  const permissionSlugs = new Set(
+    user.assignments.flatMap(assignment => assignment.permissions.map(permission => permission.slug))
+  )
+
+  user.permissions = [...permissionSlugs].sort((left, right) => left.localeCompare(right, 'ja'))
+
+  return user
+}
+
+function createMockAssignment(input: UserAssignmentMutationInput): UserAssignmentItem {
+  const scope = mockScopes.find(item => item.id === input.scope_id)
+  const role = mockRoles.find(item => item.id === input.role_id)
+
+  if (!scope || !role) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Scope or role not found'
+    })
+  }
+
+  if (scope.layer !== role.scope_layer) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Role scope layer does not match the selected scope'
+    })
+  }
+
+  return {
+    id: Math.max(0, ...mockUsers.flatMap(user => user.assignments.map(assignment => assignment.id))) + 1,
+    scope,
+    role,
+    permissions: role.permissions
+  }
+}
+
+function addMockUserAssignment(keycloakSub: string, input: UserAssignmentMutationInput): UserShowResponse {
+  const user = mockUsers.find(item => item.keycloak_sub === keycloakSub)
+
+  if (!user) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'User not found'
+    })
+  }
+
+  const alreadyExists = user.assignments.some(
+    assignment => assignment.scope.id === input.scope_id && assignment.role.id === input.role_id
+  )
+
+  if (alreadyExists) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'The assignment already exists.'
+    })
+  }
+
+  user.assignments.push(createMockAssignment(input))
+
+  return { data: rebuildUserPermissions(user) }
+}
+
+function removeMockUserAssignment(keycloakSub: string, assignmentId: number): void {
+  const user = mockUsers.find(item => item.keycloak_sub === keycloakSub)
+
+  if (!user) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'User not found'
+    })
+  }
+
+  const assignmentIndex = user.assignments.findIndex(assignment => assignment.id === assignmentId)
+
+  if (assignmentIndex === -1) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Assignment not found'
+    })
+  }
+
+  user.assignments.splice(assignmentIndex, 1)
+  rebuildUserPermissions(user)
+}
+
 function withAuthorizationHeaders(token: string) {
   if (!token) {
     return undefined
   }
 
   return {
-    Authorization: `Bearer ${token}`
+    Authorization: `Bearer ${token}`,
+    'X-Forwarded-Authorization': `Bearer ${token}`
+  }
+}
+
+function withAuthorizationQuery(token: string) {
+  if (!token) {
+    return undefined
+  }
+
+  return {
+    access_token: token
   }
 }
 
@@ -350,6 +503,7 @@ export function useApUserManagement() {
       baseURL: apiBase.value,
       headers: withAuthorizationHeaders(bearerToken.value),
       query: buildQuery({
+        ...withAuthorizationQuery(bearerToken.value),
         scope_id: filters.scope_id,
         keycloak_sub: filters.keycloak_sub,
         keyword: filters.keyword,
@@ -367,7 +521,8 @@ export function useApUserManagement() {
 
     return await $fetch<UserShowResponse>(`/users/${keycloakSub}`, {
       baseURL: apiBase.value,
-      headers: withAuthorizationHeaders(bearerToken.value)
+      headers: withAuthorizationHeaders(bearerToken.value),
+      query: withAuthorizationQuery(bearerToken.value)
     })
   }
 
@@ -380,6 +535,7 @@ export function useApUserManagement() {
       baseURL: apiBase.value,
       headers: withAuthorizationHeaders(bearerToken.value),
       query: buildQuery({
+        ...withAuthorizationQuery(bearerToken.value),
         layer: filters.layer,
         parent_scope_id: filters.parent_scope_id,
         code: filters.code,
@@ -389,10 +545,60 @@ export function useApUserManagement() {
     })
   }
 
+  async function listRoles(filters: RoleIndexFilters = {}): Promise<RoleIndexResponse> {
+    if (mode.value === 'mock' || !apiBase.value) {
+      return filterMockRoles(filters)
+    }
+
+    return await $fetch<RoleIndexResponse>('/roles', {
+      baseURL: apiBase.value,
+      headers: withAuthorizationHeaders(bearerToken.value),
+      query: buildQuery({
+        ...withAuthorizationQuery(bearerToken.value),
+        scope_layer: filters.scope_layer,
+        permission_role: filters.permission_role,
+        slug: filters.slug,
+        name: filters.name,
+        sort: filters.sort
+      })
+    })
+  }
+
+  async function addUserAssignment(keycloakSub: string, input: UserAssignmentMutationInput): Promise<UserShowResponse> {
+    if (mode.value === 'mock' || !apiBase.value) {
+      return addMockUserAssignment(keycloakSub, input)
+    }
+
+    return await $fetch<UserShowResponse>(`/users/${keycloakSub}/assignments`, {
+      method: 'POST',
+      baseURL: apiBase.value,
+      headers: withAuthorizationHeaders(bearerToken.value),
+      query: withAuthorizationQuery(bearerToken.value),
+      body: input
+    })
+  }
+
+  async function deleteUserAssignment(keycloakSub: string, assignmentId: number): Promise<void> {
+    if (mode.value === 'mock' || !apiBase.value) {
+      removeMockUserAssignment(keycloakSub, assignmentId)
+      return
+    }
+
+    await $fetch(`/users/${keycloakSub}/assignments/${assignmentId}`, {
+      method: 'DELETE',
+      baseURL: apiBase.value,
+      headers: withAuthorizationHeaders(bearerToken.value),
+      query: withAuthorizationQuery(bearerToken.value)
+    })
+  }
+
   return {
     mode,
     listUsers,
     getUser,
-    listScopes
+    listScopes,
+    listRoles,
+    addUserAssignment,
+    deleteUserAssignment
   }
 }

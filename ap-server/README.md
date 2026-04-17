@@ -42,6 +42,20 @@ docker compose exec ap-frontend sh
 
 このコンテナ内で `Nuxt 4 + Nuxt UI` の初期化を進めます。
 
+ブラウザ確認:
+
+- `https://ap.example.com`
+  `ap-server/frontend` の dashboard / users UI を出す入口
+- `https://global.example.com`
+  既存の Global Login Portal / BFF 入口
+
+呼び分け:
+
+- 「Global Login Portal」
+  `global.example.com` 側を指す
+- 「AP Frontend」
+  `ap.example.com` 側を指す
+
 ## バックエンド作業コンテナ
 
 `ap-server/backend` は、専用の `ap-backend` コンテナに入って作業する前提です。
@@ -58,4 +72,4 @@ docker compose up -d ap-backend
 docker compose exec ap-backend bash
 ```
 
-このコンテナ内で `Laravel 13` の初期化を進めます。
+このコンテナ内で `Laravel 13` の初期化を進めます。live mode 検証では `ap-backend` は `docker/env/laravel.common.env` と `docker/env/ap-backend.env` を読み、image entrypoint で `.env` 反映と `php artisan serve --host=0.0.0.0 --port=8000` まで自動起動する前提に寄せてあります。初回の live セットアップと認証切り分けの詳細は `backend/README.md` を参照してください。

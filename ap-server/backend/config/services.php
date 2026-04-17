@@ -37,6 +37,7 @@ return [
 
     'keycloak' => [
         'issuer' => env('KEYCLOAK_ISSUER'),
+        'internal_base_url' => env('KEYCLOAK_INTERNAL_BASE_URL'),
         'client_id' => env('KEYCLOAK_CLIENT_ID'),
         'public_key' => env('KEYCLOAK_PUBLIC_KEY'),
         'jwks_url' => env('KEYCLOAK_JWKS_URL'),
