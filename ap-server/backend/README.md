@@ -1743,6 +1743,20 @@ php artisan test
 - 影響範囲: `GET /api/users`, `GET /api/scopes` の拡張優先順位、`ap-server/frontend/README.md` の users UI 前提、CurrentUser / token 受け口を追加する次工程、`ap-server/backend/README.md`
 - 次の推奨アクション: 次は frontend 側で CurrentUser または Bearer token の受け口を 1 箇所に寄せ、`mock` から `live` へ切り替えても `GET /api/users`, `GET /api/users/{keycloakSub}`, `GET /api/scopes` を同じ画面で確認できるようにする
 
+### AP Frontend の SSO bridge では `global-login` と `ap-frontend` の両 token audience を受け入れる
+
+- 背景: AP Frontend に `global login -> /auth/bridge -> /auth/callback` の SSO bridge を追加すると、bridge 後に browser が保持する access token の `azp` は `ap-frontend` になる。一方、live の `ap-backend` は `KEYCLOAK_CLIENT_ID=global-login` 前提のままだったため、実際に bridge で取った token を `GET /api/me` へ流すと `current_user: null` になり、AP Frontend の自然復帰が最後で詰まった
+- 決定事項: backend の Keycloak token resolver は単一 `KEYCLOAK_CLIENT_ID` 固定ではなく、`KEYCLOAK_ACCEPTED_CLIENT_IDS` で複数 audience / `azp` を受け入れる。live の AP backend 既定値は `global-login,ap-frontend` とし、従来の debug token と AP Frontend bridge token の両方を同じ `/api/me*` / `/api/users*` 系で扱えるようにする
+- 影響範囲: `ap-server/backend/config/services.php`、`app/Services/Auth/KeycloakTokenCurrentUserResolver.php`、`docker/env/ap-backend.env`、AP Frontend の SSO bridge live 実測、今後 app-a / app-b token を追加で許可する時の env 運用
+- 次の推奨アクション: 次は `docker compose up -d --force-recreate ap-backend ap-backend-fpm nginx` で accepted client ids を反映し、AP Frontend bridge で取った `ap-frontend` token が `GET /api/me` と `GET /api/me/authorization` を live で解決できることを確認する
+
+### live の AP Frontend bridge token でも `GET /api/me*` は `Alice A` を返せる
+
+- 背景: accepted client ids を追加したあとも、実 token で確認しない限り「env を足しただけで本当に bridge token が通るのか」は断言できなかった。特に AP Frontend 側の bridge は `prompt=none + PKCE` の code flow を使うため、従来の `global-login` direct grant token と claim 構成が少し違っていた
+- 決定事項: `docker compose up -d --force-recreate ap-backend ap-backend-fpm nginx` 後に live の SSO bridge を HTTP で再現すると、`ap-frontend` token の payload は `sub=tenant-user-a`, `azp=ap-frontend`, `allowed-origins=[https://ap.example.com]` で、これを `https://ap-backend-fpm.example.com/api/me` と `/api/me/authorization` へ流した結果、どちらも `current_user = Alice A` を返した。`/api/me/authorization` では `user.manage` を含む authorization まで取得できたため、backend 側では AP Frontend bridge token を live で受け入れられると扱う
+- 影響範囲: AP Frontend の SSO bridge live 検証手順、`KEYCLOAK_ACCEPTED_CLIENT_IDS` の既定値、今後 `/api/users*` を bridge token で叩く前提、backend と frontend README の整合
+- 次の推奨アクション: 次は実ブラウザで AP Frontend の users 画面から `SSO Login` を押し、bridge token で `Current User = Alice A` と users 一覧 / 詳細の query 復元が UI 上でも自然に見えるかを通し確認する
+
 ### frontend の CurrentUser 取得口は `GET /api/me` を基準にする
 
 - 背景: frontend 側で auth 入口を 1 箇所に寄せる作業を進め、app shell から mode 切り替えと Bearer token 設定を扱えるようにした。これにより users 一覧 / 詳細がどちらも同じ token で live API を叩ける状態になり、CurrentUser の解決も backend 契約に沿って一本化できた
