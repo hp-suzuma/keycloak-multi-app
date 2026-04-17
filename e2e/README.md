@@ -43,6 +43,12 @@ root 権限が取れるタイミングで Ubuntu 直の Chromium 依存 library 
 pnpm --dir e2e run install:ubuntu-libs
 ```
 
+`doctor` が apt source の `http` を検知した時は、次で `ubuntu.sources` を `https` に寄せられます。
+
+```bash
+pnpm --dir e2e run fix:ubuntu-apt-sources
+```
+
 ## 実行前チェック
 
 Ubuntu Server へ入れた直後は、まず browser 実行前提だけ先に確認します。
@@ -120,3 +126,4 @@ pnpm --dir e2e test:headed
 - `test:sso:auto` は library 不足時だけ container fallback し、アプリ側 assertion 失敗では自動再実行しない
 - 実機で確認した不足 library は `libatk1.0-0t64`, `libatk-bridge2.0-0t64`, `libcups2t64`, `libasound2t64`, `libgbm1`, `libcairo2`, `libpango-1.0-0`, `libxcomposite1`, `libxdamage1`, `libxfixes3`, `libxrandr2`, `libatspi2.0-0t64`
 - apt source が `archive.ubuntu.com` / `security.ubuntu.com` の `http` で詰まる場合は、Ubuntu 側の `ubuntu.sources` を `https` へ変更してから `pnpm --dir e2e run install:ubuntu-libs` を再実行する
+- `fix:ubuntu-apt-sources` は `/etc/apt/sources.list.d/ubuntu.sources` を backup したうえで `archive/security` の URI を `https` に置き換える

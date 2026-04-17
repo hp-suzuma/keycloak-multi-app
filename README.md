@@ -70,6 +70,7 @@ root 権限が取れるタイミングでは `pnpm --dir e2e run install:ubuntu-
 この Ubuntu Server では apt source の `URIs` を `http://archive.ubuntu.com` / `http://security.ubuntu.com` から `https://...` に変更したあと、Ubuntu 直の `pnpm --dir e2e run test:sso` が pass した。
 今後は `pnpm --dir e2e run doctor` の中でも Ubuntu apt source の `http/https` を確認し、新しい server で同じ詰まり方を早めに検知する。
 fresh Ubuntu Server の通し確認は `pnpm --dir e2e run verify:ubuntu` を入口にして、`doctor -> wait:stack -> test:sso:auto` をまとめて流せるようにする。
+apt source が `http` のままなら、repo 内の `pnpm --dir e2e run fix:ubuntu-apt-sources` で `https` に揃えてから先へ進む。
 
 ### `bff-b` の扱い
 

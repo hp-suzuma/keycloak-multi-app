@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "bootstrap:ubuntu": "bash ./scripts/bootstrap-ubuntu.sh",
+    "fix:ubuntu-apt-sources": "bash ./scripts/fix-ubuntu-apt-sources.sh",
     "install:ubuntu-libs": "bash ./scripts/install-ubuntu-playwright-libs.sh",
     "doctor": "node ./scripts/doctor.mjs",
     "wait:stack": "node ./scripts/wait-for-stack.mjs",

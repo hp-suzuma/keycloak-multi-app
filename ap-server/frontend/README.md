@@ -373,3 +373,10 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `e2e/scripts/verify-ubuntu-e2e.sh` と `pnpm --dir e2e run verify:ubuntu` を追加し、fresh server の通し確認はこのコマンドを入口にする。中では `doctor -> wait:stack -> test:sso:auto` を順に流す
 - 影響範囲: 新しい Ubuntu Server での browser 実測開始手順、初回セットアップ後の smoke test、今後の handoff
 - 次の推奨アクション: 次は別の Ubuntu Server で `pnpm --dir e2e run verify:ubuntu` を実行し、`doctor` の apt source 判定から `test:sso:auto` まで同じ導線で通るかを確認する
+
+### apt source の `http` 修正も repo 内 script に寄せる
+
+- 背景: `doctor` が apt source の `http` を検知できるようになっても、修正手順が会話頼みだと別 server で手が止まりやすい
+- 決定事項: `e2e/scripts/fix-ubuntu-apt-sources.sh` と `pnpm --dir e2e run fix:ubuntu-apt-sources` を追加し、`/etc/apt/sources.list.d/ubuntu.sources` の `archive/security` URI を backup つきで `https` へ置き換えられるようにした
+- 影響範囲: 新しい Ubuntu Server の apt recovery 手順、`doctor` 後の修正導線、browser 実測の再現性
+- 次の推奨アクション: 次は別の Ubuntu Server で `doctor` が apt source `http` を検知した時に `pnpm --dir e2e run fix:ubuntu-apt-sources` を実行し、その後 `verify:ubuntu` が通るかを確認する
