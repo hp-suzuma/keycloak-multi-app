@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
 import { describeApApiError } from '~/utils/apApiError'
+import { buildAuthRecoveryCopy } from '~/utils/authRecoveryCopy'
 import { resolvePermissionAccessStatus } from '~/utils/permissionScopes'
 
 definePageMeta({
@@ -85,21 +86,7 @@ const activeScope = computed(() => selectedTenant.value ?? selectedService.value
 const userManageAccess = computed(() =>
   resolvePermissionAccessStatus(authorization.value, 'user.manage', activeScope.value?.id)
 )
-const authRecoveryMessage = computed(() => {
-  if (authRecoveryKind.value === 'setup') {
-    return 'users 一覧の本番向け復旧導線は `global.example.com/login` です。Auth Entry の token 設定は live debug 用としてだけ使います。'
-  }
-
-  if (authRecoveryKind.value === 'refresh') {
-    return '期限切れ token では Auth Entry が `null current_user`、users API が `403` になりやすいため、まず SSO Login へ戻します。live debug を続ける時だけ fresh token を更新してください。'
-  }
-
-  if (authRecoveryKind.value === 'retry') {
-    return 'users API で `401/403` が続く時は、実運用では SSO Login へ戻します。live debug の切り分けでは Auth Entry で token と API Base を確認してください。'
-  }
-
-  return null
-})
+const authRecoveryCopy = computed(() => buildAuthRecoveryCopy(authRecoveryKind.value, 'users-index'))
 
 const sortOptions = [
   { label: 'メールアドレス A-Z', value: 'email' },
@@ -236,20 +223,20 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
           </template>
 
           <p class="text-sm leading-6 text-toned">
-            live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。一覧取得で `Forbidden` や `CurrentUser 未取得` に見える時は、まず Auth Entry で fresh token を入れ直してから再試行してください。
+            live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。一覧取得で `Forbidden` や `CurrentUser 未取得` に見える時は、まず `SSO Login` で session を張り直し、live debug を続ける時だけ Auth Entry で token と API Base を確認してください。
           </p>
           <p class="mt-2 text-xs leading-5 text-muted">
-            正常系では Auth Entry の `Current User` が `Alice A` になり、`user.manage` を持った状態でこの一覧が開きます。
+            `Failed to fetch` に見える時は session recovery ではなく、`ap-backend-fpm.example.com` の hosts と証明書許可を先に確認します。正常系では Auth Entry の `Current User` が `Alice A` になり、`user.manage` を持った状態でこの一覧が開きます。
           </p>
           <div
-            v-if="needsAuthRecovery && authRecoveryMessage"
+            v-if="needsAuthRecovery && authRecoveryCopy.body"
             class="mt-4 rounded-2xl border border-amber-300/70 bg-white/70 p-4 dark:bg-stone-950/30"
           >
             <p class="text-sm font-semibold text-highlighted">
               Re-auth Flow
             </p>
             <p class="mt-2 text-sm text-toned">
-              {{ authRecoveryMessage }}
+              {{ authRecoveryCopy.body }}
             </p>
             <div class="mt-3 flex flex-wrap gap-2">
               <UButton
@@ -270,7 +257,7 @@ function buildUserLink(keycloakSub: string): RouteLocationRaw {
               </UButton>
             </div>
             <p class="mt-3 text-xs text-muted">
-              `SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻ります。live session を手放してから切り分け直したい時はこちらを使います。
+              {{ authRecoveryCopy.logoutHint }}
             </p>
           </div>
         </UCard>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PermissionRole, ScopeItem, UserAssignmentItem } from '~/composables/useApUserManagement'
 import { describeApApiError } from '~/utils/apApiError'
+import { buildAuthRecoveryCopy } from '~/utils/authRecoveryCopy'
 import { resolvePermissionAccessStatus } from '~/utils/permissionScopes'
 
 definePageMeta({
@@ -141,21 +142,7 @@ const selectedRoleUserManageAccess = computed(() =>
 const pendingRemovalUserManageAccess = computed(() =>
   resolvePermissionAccessStatus(authorization.value, 'user.manage', pendingRemovalAssignment.value?.scope.id)
 )
-const authRecoveryMessage = computed(() => {
-  if (authRecoveryKind.value === 'setup') {
-    return 'users 詳細の本番向け復旧導線は `global.example.com/login` です。Auth Entry の token 設定は live debug 用としてだけ使います。'
-  }
-
-  if (authRecoveryKind.value === 'refresh') {
-    return '期限切れ token では Auth Entry が `null current_user`、assignment 系 API が `403` になりやすいため、まず SSO Login へ戻します。live debug を続ける時だけ fresh token を入れ直してください。'
-  }
-
-  if (authRecoveryKind.value === 'retry') {
-    return 'assignment 追加 / 削除や詳細再取得で `401/403` が続く時は、実運用では SSO Login へ戻します。live debug の切り分けでは Auth Entry で token と API Base を確認してください。'
-  }
-
-  return null
-})
+const authRecoveryCopy = computed(() => buildAuthRecoveryCopy(authRecoveryKind.value, 'users-detail'))
 
 const filteredAssignmentScopeOptions = computed(() => {
   const keyword = scopeSearchKeyword.value.trim().toLowerCase()
@@ -407,20 +394,20 @@ async function removeAssignment() {
         </template>
 
         <p class="text-sm leading-6 text-toned">
-          live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。assignment 追加 / 削除で失敗した時は UI より先に token expiry を疑い、Auth Entry で fresh token を入れ直してから再試行してください。
+          live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。assignment 追加 / 削除や詳細再取得で `401/403` が続く時は、まず `SSO Login` で session を張り直し、live debug を続ける時だけ Auth Entry で token と API Base を確認してください。
         </p>
         <p class="mt-2 text-xs leading-5 text-muted">
-          正常系では viewer が `Alice A` で、assignment 追加は `201`、重複追加は `422`、削除は `204` になります。
+          `Failed to fetch` に見える時は session recovery ではなく、`ap-backend-fpm.example.com` の hosts と証明書許可を先に確認します。正常系では viewer が `Alice A` で、assignment 追加は `201`、重複追加は `422`、削除は `204` になります。
         </p>
         <div
-          v-if="needsAuthRecovery && authRecoveryMessage"
+          v-if="needsAuthRecovery && authRecoveryCopy.body"
           class="mt-4 rounded-2xl border border-amber-300/70 bg-white/70 p-4 dark:bg-stone-950/30"
         >
           <p class="text-sm font-semibold text-highlighted">
             Re-auth Flow
           </p>
           <p class="mt-2 text-sm text-toned">
-            {{ authRecoveryMessage }}
+            {{ authRecoveryCopy.body }}
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
             <UButton
@@ -441,7 +428,7 @@ async function removeAssignment() {
             </UButton>
           </div>
           <p class="mt-3 text-xs text-muted">
-            `SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻ります。users 詳細で session を閉じてから再確認したい時はこちらを使います。
+            {{ authRecoveryCopy.logoutHint }}
           </p>
         </div>
       </UCard>

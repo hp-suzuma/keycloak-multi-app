@@ -98,6 +98,15 @@ pnpm --dir e2e run selfcheck:recover-ubuntu
 
 これは temp の `ubuntu.sources` fixture を `http` で作り、`recover:ubuntu` が `https` へ書き換えて通し確認まで進むかをローカルで検証します。
 
+`2026-04-20` 時点では、この selfcheck を実行して `recover:ubuntu -> verify:ubuntu -> test:sso:auto` まで完走し、最後の `ap-frontend-sso-recovery.spec.ts` も `6 passed` を確認しました。
+
+### Ubuntu 実機 recovery は保留し、次は browser 回帰の横展開へ進む
+
+- 背景: `selfcheck:recover-ubuntu` により temp fixture 上の `recover:ubuntu` 分岐はローカルで閉じられたが、別 Ubuntu Server 実機がまだ用意できていないため、`triage:ubuntu` の real `/etc/apt` / shared library 検証は次チャット以降へ持ち越すことになった。いまは SSO recovery の container 回帰基盤と users 文脈の spec が安定しているので、同じ E2E 方針を次の AP Frontend 画面へ広げる方が優先度に合う
+- 決定事項: Ubuntu recovery の実機確認は保留とし、次チャットのテーマは「SSO recovery 以外の browser 回帰へ拡張」に切り替える。最初の対象候補は `objects` / `policies` で、既存方針どおり live stack・Playwright 公式コンテナ・文言全文を固定しすぎない assertion を前提に spec 設計を始める
+- 影響範囲: `triage:ubuntu` の再開条件、今後の `e2e/tests` 拡張方針、objects / policies 実装時の回帰設計
+- 次の推奨アクション: 次チャットでは `ap-server/frontend` の `objects` / `policies` 画面の現状を棚卸しし、users 系と同じ spec に広げるか、新しい browser spec を切るかを決めてから実装へ入る
+
 `doctor` は次をまとめて確認します。
 
 - `Node 22+`
@@ -279,6 +288,48 @@ pnpm --dir e2e test:headed
 - 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` に `PLAYWRIGHT_SSO_DEBUG=1` を追加で渡せる入口を設け、SSO login URL に `sso_debug=1` を載せられるようにした。さらに login helper の URL wait は、`/auth/callback` 上で timeout した時に `sessionStorage["ap-sso-debug-trace"]` を読み出して error に添える形へ変更した。加えて再発時の入口コマンドを `pnpm --dir e2e run test:sso:debug` に固定し、env を手で前置しなくても trace 付き再実行へ入れるようにした。通常回帰の失敗直後に自動で debug rerun まで進めたい時は `pnpm --dir e2e run test:sso:triage` を使い、triage script 自体が `Callback latest stage` まで要約して `e2e/test-results/callback-triage-summary.txt` にも保存する
 - 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Playwright container での callback stall 切り分け、今後の一時 debug 実行手順
 - 次の推奨アクション: 次回 callback stall が再発したら、まず `pnpm --dir e2e run test:sso:triage` を流して standard failure と debug rerun をまとめて取り、`e2e/test-results/callback-triage-summary.txt` の `Callback latest stage` を README に追記する
+
+### auth recovery 文言整理の回帰は triage standard pass を成功ラインに据える
+
+- 背景: `Auth Entry` と users 画面の recovery 文言を共通 util へ寄せたあと、Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を流したところ、最初の login case だけが 60 秒 timeout で落ちた。失敗時の stack trace は `waitForSsoArrival()` から `readCallbackDebugTrace()` を呼んだ瞬間に page close 済みだったことを示しており、前チャットから引き継いでいる callback/login flake の再発に近い断面だった
+- 決定事項: この失敗を文言変更の退行と断定せず、README で定めた入口どおり `pnpm --dir e2e run test:sso:triage` を続けて実行した。triage の standard rerun では `tests/ap-frontend-sso-recovery.spec.ts` が `5 passed` となり、debug rerun は不要だったため、今回の auth recovery 文言整理は保持する。現時点の container 回帰は「単発 failure が出ても triage standard rerun が `5 passed` なら既知 flake 扱い」の運用で引き継ぐ
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`waitForSsoArrival()` の timeout 時挙動、auth recovery 文言変更時の container 検証フロー
+- 次の推奨アクション: 次回同じ timeout が再発したら、`Callback latest stage` が取れたかに加えて `readCallbackDebugTrace()` が page close 済みでも落ちずに要約へ進めるよう、helper 側の例外吸収を検討する
+
+### users recovery CTA は wording ではなく役割だけを軽く固定する
+
+- 背景: auth recovery 文言は今後も細かく調整する余地がある一方、users 画面では `SSO Login` と `Auth Entry Debug` の 2 本立てが崩れていないことだけは回帰で拾いたかった。全文一致に寄せると wording 整理のたびに spec が無駄に壊れやすくなる
+- 決定事項: `tests/ap-frontend-sso-recovery.spec.ts` に、users 一覧の live + token なし状態を localStorage で作り、`Re-auth Flow` 内に `SSO Login` と `Auth Entry Debug` が見えることだけを確認する軽い assertion を追加した。`Auth Entry Debug` は `/#auth-entry` を向くことまで見て、文言本文は固定しない。users 詳細は token なし初回読み込みで detail API error へ落ちやすいため、今回は recovery banner 自体の固定対象にしない。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、users recovery CTA の回帰基準、今後の wording 調整時の test 保守性
+- 次の推奨アクション: 次は callback stall 再発時の failure 要約を壊さないため、`readCallbackDebugTrace()` が page close 済みでも `waitForSsoArrival()` が素直に元の timeout を添えて返せるよう helper を見直す
+
+### callback trace helper は page close 済みでも要約を返す
+
+- 背景: callback/login flake が再発した時、`waitForSsoArrival()` の catch 節で `readCallbackDebugTrace()` 自体が `Target page, context or browser has been closed` を投げると、元の URL wait timeout よりも helper 側の例外が目立ち、triage で見たい情報がかえって読みづらくなっていた
+- 決定事項: `tests/ap-frontend-sso-recovery.spec.ts` の `readCallbackDebugTrace()` は page close 済みなら例外ではなく `unavailable: page already closed` を返し、`page.evaluate()` 失敗時も `unavailable: ...` の文字列へ吸収するようにした。`waitForSsoArrival()` も current URL を安全に扱い、callback timeout か page close の断面では `Current URL` と `Callback trace` を添えつつ元の wait error を `cause` に残す。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時のエラー可読性、`test:sso:triage` 実行後の failure 読み解き
+- 次の推奨アクション: 次は callback stall が実際に再発した時に、新しい helper 要約と `callback-triage-summary.txt` の内容が重複しすぎていないかを見て、必要なら helper 側の文面をさらに圧縮する
+
+### callback helper の wording は triage summary 前提で短く保つ
+
+- 背景: `callback-triage-summary.txt` は `Callback latest stage` や trace 件数を別途要約してくれるため、helper 側まで `SSO debug enabled` などの補助情報を増やすと、再発時ログが冗長になりやすかった。helper には callback timeout の断面を最短で再確認できる情報だけ残せば十分だった
+- 決定事項: `tests/ap-frontend-sso-recovery.spec.ts` の timeout 文面を `SSO callback timeout while waiting for ...` と `Callback URL: ...` へ短縮し、`SSO debug enabled` 行は削除した。`Callback trace:` の prefix だけは triage script の抽出条件なので維持する。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時のログ量、helper と triage summary の役割分担
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `test:sso:triage` を流し、新しい helper 文面と `callback-triage-summary.txt` の並びが読みやすいかを実例で確認する
+
+### callback triage の wording は selfcheck で先に確認できる
+
+- 背景: 実際の callback stall 再発を待たないと helper 文面と triage summary の並びを確認できないままだと、改善の手応えをその場で残しにくかった。sample log でも `Callback trace:` の抽出と `Callback latest stage` の要約が噛み合うなら、実再発時の見え方もかなり先回りして確認できる
+- 決定事項: `scripts/selfcheck-callback-triage.sh` と `pnpm --dir e2e run selfcheck:callback-triage` を追加し、圧縮済み helper 文面を含む sample timeout log を `print-callback-trace-summary.mjs` に流して自己確認できるようにした。selfcheck では trace line 抽出、`Callback trace count: 3`、`Callback latest stage: callback:token-exchange:error`、`Callback latest at: ...` を検証し、実行結果は pass した
+- 影響範囲: `e2e/scripts/selfcheck-callback-triage.sh`、`e2e/package.json`、callback triage wording の自己確認手順、実再発前の検証導線
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `pnpm --dir e2e run test:sso:triage` を流し、実ログでも selfcheck と同じ読み味になっているかを確認する
+
+### `test:sso:triage` の現状確認では standard run が `6 passed` で止まる
+
+- 背景: selfcheck だけでは triage runner 本体の現状態までは分からないため、実際に `pnpm --dir e2e run test:sso:triage` を流した時に standard pass でどう終わるかを一度見ておきたかった。callback stall が未再発の間は、debug rerun まで進まないこと自体が正常動作になる
+- 決定事項: `pnpm --dir e2e run test:sso:triage` を実行し、Playwright 公式コンテナの standard run は `6 passed`、runner は `[e2e] standard run passed. No debug rerun needed.` で終了することを確認した。現時点では triage の入口や summary 導線に追加修正は不要で、実再発時だけ同じ入口から debug rerun へ進めばよい
+- 影響範囲: `e2e/scripts/run-sso-triage.sh` の期待挙動、callback stall 未再発時の運用、次回 triage 開始条件
+- 次の推奨アクション: 次は callback stall の実再発を待ち、再発した時点で `pnpm --dir e2e run test:sso:triage` を流して helper 文面と `callback-triage-summary.txt` の実ログ上の噛み合いを確認する
 
 ## 補足
 

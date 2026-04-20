@@ -9,6 +9,8 @@ const usersDetailWithKeywordPath = '/users/tenant-user-b?service_scope_id=2&tena
 const serviceOnlyUsersDetailAlicePath = '/users/tenant-user-a?service_scope_id=2&keyword=alice&sort=-email'
 const authEntryPath = '/?logged_out=1#auth-entry'
 const ssoDebugEnabled = process.env.PLAYWRIGHT_SSO_DEBUG === '1'
+const MODE_STORAGE_KEY = 'ap-user-management-mode'
+const TOKEN_STORAGE_KEY = 'ap-api-bearer-token'
 
 async function submitKeycloakLogin(page: Page) {
   await page.locator('input[name="username"]').fill(process.env.KEYCLOAK_USERNAME ?? 'alice')
@@ -34,20 +36,31 @@ function buildGlobalSsoLoginUrl(nextPath = usersPath) {
 }
 
 async function readCallbackDebugTrace(page: Page) {
-  return page.evaluate(() => sessionStorage.getItem('ap-sso-debug-trace'))
+  if (page.isClosed()) {
+    return 'unavailable: page already closed'
+  }
+
+  try {
+    return await page.evaluate(() => sessionStorage.getItem('ap-sso-debug-trace'))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    return `unavailable: ${message}`
+  }
 }
 
 async function waitForSsoArrival(page: Page, nextPath: string) {
   try {
     await page.waitForURL(`**${nextPath}`)
   } catch (error) {
-    if (page.url().includes('/auth/callback')) {
+    const currentUrl = page.isClosed() ? 'unavailable: page already closed' : page.url()
+
+    if (currentUrl.includes('/auth/callback') || currentUrl.includes('page already closed')) {
       const trace = await readCallbackDebugTrace(page)
       throw new Error(
         [
-          `SSO callback did not finish while waiting for ${nextPath}.`,
-          `Current URL: ${page.url()}`,
-          `SSO debug enabled: ${ssoDebugEnabled}`,
+          `SSO callback timeout while waiting for ${nextPath}.`,
+          `Callback URL: ${currentUrl}`,
           `Callback trace: ${trace ?? 'missing'}`
         ].join('\n'),
         { cause: error }
@@ -62,6 +75,15 @@ async function loginViaGlobalSso(page: Page, nextPath = usersPath) {
   await page.goto(buildGlobalSsoLoginUrl(nextPath))
   await submitKeycloakLogin(page)
   await waitForSsoArrival(page, nextPath)
+}
+
+async function openUsersIndexRecoveryState(page: Page, nextPath = usersListWithoutKeywordPath) {
+  await page.goto('/')
+  await page.evaluate(([modeStorageKey, tokenStorageKey]) => {
+    localStorage.setItem(modeStorageKey, 'live')
+    localStorage.removeItem(tokenStorageKey)
+  }, [MODE_STORAGE_KEY, TOKEN_STORAGE_KEY])
+  await page.goto(nextPath)
 }
 
 async function openUserMenu(page: Page) {
@@ -98,6 +120,21 @@ test('AP Frontend recovers to the same users query after SSO login', async ({ pa
 
   await expect(page.getByRole('main').getByText('Alice A', { exact: true })).toBeVisible()
   await expect(page.getByRole('main').getByText(/user\.manage:\s+descendant access/i)).toBeVisible()
+})
+
+test('AP Frontend users index shows SSO Login and Auth Entry Debug when auth recovery is needed', async ({ page }) => {
+  await openUsersIndexRecoveryState(page)
+
+  const reAuthCard = page.locator('[class*="rounded-2xl"]').filter({
+    has: page.getByRole('link', { name: 'SSO Login' })
+  }).filter({
+    has: page.getByRole('link', { name: 'Auth Entry Debug' })
+  }).first()
+
+  await expect(reAuthCard.getByText('Re-auth Flow')).toBeVisible()
+  await expect(reAuthCard.getByRole('link', { name: 'SSO Login' })).toBeVisible()
+  await expect(reAuthCard.getByRole('link', { name: 'Auth Entry Debug' })).toBeVisible()
+  await expect(reAuthCard.getByRole('link', { name: 'Auth Entry Debug' })).toHaveAttribute('href', '/#auth-entry')
 })
 
 test('AP Frontend clears the local session and returns to Auth Entry after SSO logout', async ({ page }) => {

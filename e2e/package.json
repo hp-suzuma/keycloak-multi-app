@@ -19,6 +19,7 @@
     "test:sso:container": "bash ./scripts/run-sso-container.sh",
     "test:sso:debug": "PLAYWRIGHT_SSO_DEBUG=1 bash ./scripts/run-sso-container.sh",
     "test:sso:triage": "bash ./scripts/run-sso-triage.sh",
+    "selfcheck:callback-triage": "bash ./scripts/selfcheck-callback-triage.sh",
     "test:headed": "playwright test --headed",
     "codegen": "playwright codegen https://ap.example.com",
     "install:browsers": "playwright install --with-deps chromium"

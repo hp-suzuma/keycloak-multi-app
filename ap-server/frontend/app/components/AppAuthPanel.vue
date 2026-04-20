@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { buildAuthRecoveryCopy } from '~/utils/authRecoveryCopy'
+
 const {
   mode,
   apiBase,
@@ -29,55 +31,9 @@ const hasUserManagePermission = computed(() => authorization.value?.permissions.
 const isLoggedOutRedirect = computed(() => route.query.logged_out === '1')
 const shouldShowSsoLogin = computed(() => mode.value === 'live' || isLoggedOutRedirect.value)
 const shouldShowSsoLogout = computed(() => mode.value === 'live' && !isLoggedOutRedirect.value)
-const authRecoveryTitle = computed(() => {
-  if (authRecoveryKind.value === 'setup') {
-    return 'Session Setup'
-  }
-
-  if (authRecoveryKind.value === 'refresh') {
-    return 'Re-auth Required'
-  }
-
-  if (authRecoveryKind.value === 'retry') {
-    return 'API Retry'
-  }
-
-  return 'Auth Status'
-})
-const authRecoveryBody = computed(() => {
-  if (authRecoveryKind.value === 'setup') {
-    return '実運用の session recovery は `global.example.com/login` へ戻す方針です。Auth Entry の Bearer token 入力は live debug 用として残しています。'
-  }
-
-  if (authRecoveryKind.value === 'refresh') {
-    return '`GET /api/me` と `/api/me/authorization` は成功しましたが、どちらも `current_user: null` でした。実運用では SSO Login へ戻し、debug 時だけ fresh token へ入れ替えて再確認します。'
-  }
-
-  if (authRecoveryKind.value === 'retry') {
-    return errorMessage.value ?? 'live API への再取得が必要です。実運用では SSO Login へ戻し、debug 時だけ API Base と token を確認して再試行してください。'
-  }
-
-  return 'Auth Entry で live session を確認できます。'
-})
-const authRecoverySteps = computed(() => {
-  if (authRecoveryKind.value === 'setup') {
-    return [
-      '1. 実運用では `SSO Login` から global login へ戻る',
-      '2. live debug が必要な時だけ Bearer token を貼って `Apply & Refresh` を押す',
-      '3. `Current User` と `permissions` が埋まることを確認する'
-    ]
-  }
-
-  if (authRecoveryKind.value === 'refresh' || authRecoveryKind.value === 'retry') {
-    return [
-      '1. 実運用では `SSO Login` から global login へ戻る',
-      '2. live debug が必要な時だけ fresh token を取り直して `Apply & Refresh` を押す',
-      '3. `Current User` が復帰したあと users 画面へ戻る'
-    ]
-  }
-
-  return []
-})
+const authRecoveryCopy = computed(() => buildAuthRecoveryCopy(authRecoveryKind.value, 'auth-entry', {
+  errorMessage: errorMessage.value
+}))
 const scopeLabelById = computed(() => {
   const labels = new Map<number, string>()
 
@@ -221,10 +177,10 @@ onMounted(async () => {
             推奨 API Base: {{ RECOMMENDED_AP_API_BASE }}
           </p>
           <p class="text-xs leading-5 text-muted">
-            {{ isRecommendedApiBase ? '現在の API Base は推奨値です。' : 'current_user が null / Forbidden に見える時は、まず fresh token へ入れ替えてから再試行してください。' }}
+            {{ isRecommendedApiBase ? '現在の API Base は推奨値です。' : 'API Base が推奨値から外れている時は、まず `ap-backend-fpm.example.com/api` にそろえてから切り分けてください。' }}
           </p>
           <p class="mt-2 text-xs leading-5 text-muted">
-            live 検証で使っている Keycloak token は 5 分程度で期限切れになります。users 一覧 / 詳細 / assignment 操作を続けて確認する時は、先に token を更新しておくと切り分けがぶれません。
+            `CurrentUser 未取得` や `401/403` は、まず `SSO Login` で session を張り直し、live debug を続ける時だけ Bearer token と API Base を確認します。`Failed to fetch` は session recovery ではなく、hosts と証明書許可を先に確認してください。
           </p>
           <div
             v-if="shouldShowSsoLogin || shouldShowSsoLogout"
@@ -259,7 +215,7 @@ onMounted(async () => {
             Logout Complete
           </p>
           <p class="mt-2 text-sm text-toned">
-            global SSO logout が完了し、AP Frontend 側の local token もクリアしました。次に続ける時は `SSO Login` か debug 用 token 再設定を使います。
+            global SSO logout が完了し、AP Frontend 側の local token もクリアしました。通常の再開は `SSO Login` を使い、live debug を続ける時だけ token を再設定します。
           </p>
         </div>
 
@@ -274,7 +230,7 @@ onMounted(async () => {
             permissions: {{ authorization?.permissions.length ?? 0 }}
           </p>
           <p class="mt-2 text-xs text-muted">
-            {{ hasUserManagePermission ? '`user.manage` を確認済みです。users 管理 UI の live 検証に進めます。' : '`user.manage` が見えない場合は、token を取り直してから再取得してください。' }}
+            {{ hasUserManagePermission ? '`user.manage` を確認済みです。users 管理 UI の live 検証に進めます。' : '`user.manage` が見えない時は、まず `SSO Login` で session を張り直し、debug を続ける時だけ token と API Base を確認してから再取得してください。' }}
           </p>
         </div>
 
@@ -283,10 +239,10 @@ onMounted(async () => {
           class="rounded-2xl border border-warning/30 bg-warning/10 p-4 dark:border-warning/20"
         >
           <p class="text-xs uppercase tracking-[0.18em] text-muted">
-            {{ authRecoveryTitle }}
+            {{ authRecoveryCopy.title }}
           </p>
           <p class="mt-2 text-sm text-toned">
-            {{ authRecoveryBody }}
+            {{ authRecoveryCopy.body }}
           </p>
           <p
             v-if="liveSessionLooksExpired"
@@ -295,11 +251,11 @@ onMounted(async () => {
             live mode では、期限切れまたは無効な Bearer token でも Auth Entry 上は `403` ではなく `null` として見えることがあります。
           </p>
           <ul
-            v-if="authRecoverySteps.length"
+            v-if="authRecoveryCopy.steps.length"
             class="mt-3 space-y-1 text-xs text-muted"
           >
             <li
-              v-for="step in authRecoverySteps"
+              v-for="step in authRecoveryCopy.steps"
               :key="step"
             >
               {{ step }}
@@ -382,10 +338,13 @@ onMounted(async () => {
           <p class="text-xs uppercase tracking-[0.18em] text-muted">
             Live Verification
           </p>
+          <p class="mt-2 text-xs leading-5 text-muted">
+            実運用の主導線は `SSO Login` で、下の token 入力は live debug 専用です。network failure が見えている時は、ここを触る前に `ap-backend-fpm.example.com` の hosts と証明書許可を確認します。
+          </p>
           <ul class="mt-2 space-y-1 text-sm text-toned">
-            <li>1. `Live` に切り替える</li>
-            <li>2. `alice` の fresh token を貼って `Apply & Refresh`</li>
-            <li>3. `Current User` が `Alice A` になることを確認する</li>
+            <li>1. 実運用確認ではまず `SSO Login` で session を張り直す</li>
+            <li>2. live debug が必要な時だけ `alice` の fresh token を貼って `Apply & Refresh`</li>
+            <li>3. `Current User` が `Alice A` になり、`permissions` が埋まることを確認する</li>
             <li>4. `user.manage` を確認してから `/users` へ進む</li>
           </ul>
         </div>
@@ -451,7 +410,7 @@ onMounted(async () => {
           runtime config の token がある場合も、ここで上書きした token を優先します。設定はブラウザの localStorage に保持します。
         </p>
         <p class="text-xs leading-5 text-muted">
-          users 管理の live 検証は `alice` の fresh token を入れてから `Apply & Refresh` し、その後に `/users` へ進む運用を前提にしています。
+          users 管理の live debug は `alice` の fresh token を入れてから `Apply & Refresh` し、その後に `/users` へ進みます。通常の session recovery はこのフォームではなく `SSO Login` を使います。
         </p>
       </form>
     </div>

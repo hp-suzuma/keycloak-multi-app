@@ -395,6 +395,20 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 影響範囲: recovery 分岐のローカル検証、別 server 実機が無い段階での回帰確認、`doctor/fix/recover` のテスト容易性
 - 次の推奨アクション: 次は `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp fixture 上で `recover:ubuntu` の修正分岐が通ることを確認する
 
+### `selfcheck:recover-ubuntu` は temp fixture 上で `test:sso:auto` まで完走した
+
+- 背景: recovery 分岐の自己検証入口は用意していたが、実際に temp fixture で `doctor -> fix -> doctor -> verify:ubuntu` が最後まで通るかはまだ README に実績として残っていなかった。ここが pass していれば、別 Ubuntu Server 実機が無い段階でも apt source recovery の回帰をローカルで閉じられる
+- 決定事項: `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp の `ubuntu.sources` fixture に対して `recover:ubuntu` が `http` を検知し、`fix:ubuntu-apt-sources` で `https` へ書き換えたあと `verify:ubuntu` と `test:sso:auto` まで完走することを確認した。最終的に `ap-frontend-sso-recovery.spec.ts` は `6 passed`、selfcheck 自体も `selfcheck passed: recover:ubuntu rewrote the temp apt source fixture to https and completed verification.` で終了した
+- 影響範囲: `e2e/scripts/selfcheck-recover-ubuntu.sh`、`e2e/scripts/recover-ubuntu-e2e.sh`、Ubuntu apt recovery 分岐のローカル回帰基準、別 server 実機が無い段階での検証手順
+- 次の推奨アクション: 次は別 Ubuntu Server 実機で `pnpm --dir e2e run triage:ubuntu` を流し、real `/etc/apt` と shared library 状態でも `report -> doctor -> verify/recover` が同じ導線で進むかを確認する
+
+### Ubuntu recovery 実機確認は保留し、次テーマは browser 回帰の横展開へ移る
+
+- 背景: `recover:ubuntu` の temp fixture selfcheck までは完了したが、別 Ubuntu Server 実機の準備はまだできていないため、`triage:ubuntu` の real `/etc/apt` / shared library 検証はこのチャットでは進められなかった。一方で AP Frontend 側は users / logout-relogin の browser 回帰基盤がかなり整っており、次は SSO recovery 以外の画面へ同じ E2E 方針を広げる方が開発の流れに合っている
+- 決定事項: Ubuntu recovery の実機確認は保留とし、次チャットの開始テーマは「SSO recovery 以外の browser 回帰へ拡張」に切り替える。最初の対象候補は users に続いて実装が進みそうな `objects` / `policies` 画面とし、既存の `ap-frontend-sso-recovery.spec.ts` で使っている live stack 前提・container 回帰・文言固定を避ける assertion 方針を横展開する
+- 影響範囲: 別 Ubuntu Server 実機確認の再開タイミング、次チャットの AP Frontend browser E2E 計画、objects / policies 実装時の回帰方針
+- 次の推奨アクション: 次チャットでは `ap-server/frontend` の `objects` / `policies` 実装位置と現状 UI を確認し、browser 回帰をどの spec に切り出すか、users 系 spec に追加するか新 spec を作るかを先に決めてから着手する
+
 ### 別 server 実機の切り分けは `report:ubuntu` を先に採る
 
 - 背景: 実機で `recover:ubuntu` や `verify:ubuntu` が詰まった時、会話ごとに `uname`, apt source, `doctor`, `ldd`, `wait:stack` を個別に聞くのは往復が増えやすかった
@@ -576,3 +590,80 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: callback stall の再発確認は browser 手動確認だけでなく、E2E 側でも `PLAYWRIGHT_SSO_DEBUG=1` を使って同じ trace を採れる前提に寄せる。Playwright helper はこの env が有効な時だけ `sso_debug=1` を載せ、`/auth/callback` で timeout した場合は `sessionStorage["ap-sso-debug-trace"]` を failure に添える。再発時の container 入口は `pnpm --dir e2e run test:sso:debug` に固定し、さらに standard run が落ちた直後に debug rerun まで自動で進める `pnpm --dir e2e run test:sso:triage` も追加した。triage script は `Callback trace` の JSON から `Callback latest stage` まで自動で要約し、`e2e/test-results/callback-triage-summary.txt` に保存する
 - 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/scripts/run-sso-triage.sh`、frontend callback trace の再利用先、今後の callback stall 調査手順
 - 次の推奨アクション: 次回 callback stall が再発したら、まず `pnpm --dir e2e run test:sso:triage` を流して standard failure と debug rerun をまとめて取り、`e2e/test-results/callback-triage-summary.txt` の `Callback latest stage` を README へ追記する
+
+### AP Frontend の auth recovery 文言は共通 util に寄せる
+
+- 背景: `Auth Entry` と users 一覧 / 詳細の `Re-auth Flow` は同じ SSO recovery 方針を案内しているのに、「本番向け復旧導線」「fresh token」「SSO Logout 後の戻り先」の言い回しが画面ごとに少しずつずれていた。今後 callback stall や `401/403` 案内を詰める時も、文言の基準点を 1 か所へ寄せておいた方が追従しやすい
+- 決定事項: `ap-server/frontend/app/utils/authRecoveryCopy.ts` を追加し、`setup / refresh / retry` の recovery 文言を共通化した。`AppAuthPanel` は title / body / steps をこの util から組み立て、users 一覧 / 詳細は同じ判断基準の body と logout 補足を共有しつつ、対象 API 名だけ surface ごとに差し替える形へそろえた。検証は `docker compose exec ap-frontend npm run lint`、`docker compose exec ap-frontend npm run typecheck`、`pnpm --dir e2e run test:sso:triage` で行い、triage の standard run は `5 passed` だった
+- 影響範囲: `ap-server/frontend/app/utils/authRecoveryCopy.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、今後の auth recovery 文言修正
+- 次の推奨アクション: 次は `describeApApiError()` 側の `401/403` 文言もこの recovery 方針と突き合わせ、低レベル API エラー表示まで含めて「SSO Login を主導線、Auth Entry は debug 補助」の表現にそろえる
+
+### `describeApApiError()` の `401/403` も SSO Login 主導線へそろえる
+
+- 背景: `Re-auth Flow` はすでに「実運用では `SSO Login`、Auth Entry は debug 補助」という方針へ寄せたが、低レベル API エラー文言はまだ「fresh token を再設定」「Bearer token を再設定」の表現が前面に出ており、users 画面や Auth Entry の下部エラーだけ読むと debug 手順が主導線に見えやすかった
+- 決定事項: `ap-server/frontend/app/utils/apApiError.ts` の `401/403` 文言を更新し、まず `SSO Login` で session を張り直す案内を出し、debug を続ける時だけ Auth Entry で token と API Base を確認する形へそろえた。`403` は「期限切れ token か権限不足」、`401` は「session が外れている可能性」を短く補足する。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/utils/apApiError.ts`、`useApAuth()` の `errorMessage`、users 一覧 / 詳細 / assignment 操作時の低レベル API エラー表示
+- 次の推奨アクション: 次は `Failed to fetch` を含む network 系文言も同じ方針で見直し、証明書 / hosts 確認と SSO recovery の案内境界をどこで分けるかを整理する
+
+### `Failed to fetch` は network 前提確認を先に案内する
+
+- 背景: `401/403` を SSO recovery 主導線へ寄せたあとも、`Failed to fetch` は hosts と証明書確認だけを案内していて、「network 前提が直ったあとに session recovery を見る」の順序までは UI から読み取りにくかった。README 側では browser 実測の入口を `doctor` と hosts / URL 疎通確認へ寄せているため、低レベル文言も同じ境界でそろえたかった
+- 決定事項: `ap-server/frontend/app/utils/apApiError.ts` の `Failed to fetch` 文言を更新し、まず `ap-backend-fpm.example.com` の hosts と証明書許可を確認し、network 前提が直ったあとに session 切れが残る時だけ `SSO Login` か Auth Entry Debug で再確認する順序へ寄せた。これで network troubleshooting と auth recovery の責務境界を UI 上でも分ける。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/utils/apApiError.ts`、Auth Entry / users 一覧 / users 詳細 / assignment 操作の network failure 表示、今後の live browser 切り分け順序
+- 次の推奨アクション: 次は users 一覧 / 詳細の `Live Check` 固定文言も同じ方針で見直し、`Forbidden / CurrentUser 未取得 / Failed to fetch` がそれぞれ「SSO Login」「Auth Entry Debug」「hosts/証明書確認」のどれへつながるかを画面上で読み分けやすくする
+
+### users 一覧 / 詳細の `Live Check` も recovery と network の境界で書き分ける
+
+- 背景: 低レベル API エラー文言を整理したあとも、users 一覧 / 詳細の `Live Check` 固定文言はまだ「まず Auth Entry で fresh token」を前面に出していたため、`Forbidden / CurrentUser 未取得 / Failed to fetch` のどれで見ているのかが画面上で読み分けにくかった
+- 決定事項: `ap-server/frontend/app/pages/users/index.vue` と `ap-server/frontend/app/pages/users/[keycloakSub].vue` の `Live Check` を更新し、`Forbidden / CurrentUser 未取得 / 401/403` はまず `SSO Login` で session を張り直し、live debug を続ける時だけ Auth Entry で token と API Base を確認する流れへ寄せた。あわせて `Failed to fetch` は session recovery ではなく `ap-backend-fpm.example.com` の hosts と証明書許可を先に確認する文言へ分離した。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、users 画面の `Live Check`、今後の live browser 切り分け導線
+- 次の推奨アクション: 次は `AppAuthPanel` の `Live Mode Tips` と `Live Verification` 固定文言も同じ方針で見直し、Auth Entry 単体でも `SSO Login` / Auth Entry Debug / hosts・証明書確認 の役割分担が一貫して読めるようにする
+
+### `AppAuthPanel` の固定文言も recovery と network の境界でそろえる
+
+- 背景: users 画面の `Live Check` を整理したあとも、Auth Entry 側の `Live Mode Tips` と `Live Verification` には「fresh token を先に入れ替える」前提が残っていて、Auth Entry 単体で読むと `SSO Login` が実運用の主導線であることや、`Failed to fetch` が network 確認の話であることが少し伝わりづらかった
+- 決定事項: `ap-server/frontend/app/components/AppAuthPanel.vue` の固定文言を更新し、`CurrentUser 未取得 / 401/403` はまず `SSO Login` で session を張り直し、live debug を続ける時だけ Bearer token と API Base を確認する流れへそろえた。あわせて `Failed to fetch` は hosts / 証明書確認を先に見ること、`Live Verification` と token 入力フォームは debug 専用で通常の session recovery には使わないことを明記した。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、Auth Entry の `Live Mode Tips` / `Live Verification` / token override 補足文、今後の auth troubleshooting 説明順
+- 次の推奨アクション: 次は `Logout Complete` や `Authorization` 周辺の固定文言も同じ視点で見直し、Auth Entry 全体で「通常導線」「debug 導線」「network 導線」の 3 つが過不足なく読み分けられるかを確認する
+
+### `Logout Complete` と `Authorization` も通常導線優先でそろえる
+
+- 背景: `Live Mode Tips` と `Live Verification` を整理したあとも、`Logout Complete` には `SSO Login` と debug token 再設定が並列で並び、`Authorization` の不足メッセージはまだ「token を取り直す」が先に来ていたため、Auth Entry 全体で見た時の優先導線が少し揺れていた
+- 決定事項: `ap-server/frontend/app/components/AppAuthPanel.vue` の `Logout Complete` は「通常の再開は `SSO Login`、live debug の継続時だけ token 再設定」と読める文言へ変更した。`Authorization` では `user.manage` が見えない時の案内を、まず `SSO Login` で session を張り直し、debug を続ける時だけ token と API Base を確認して再取得する順序へ寄せた。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、Auth Entry の logout 完了案内、`user.manage` 不足時の固定文言、Auth Entry 全体の導線優先度
+- 次の推奨アクション: 次は E2E に auth recovery 文言そのものを固定しない範囲で、少なくとも `SSO Login` と `Auth Entry Debug` の役割が users 画面から見えることを拾う軽い assertion を足すかを検討する
+
+### users recovery の E2E は文言固定ではなく CTA の役割だけを拾う
+
+- 背景: auth recovery 文言を段階的に整理した結果、今後も wording 自体は調整される可能性がある一方、users 画面では「通常導線は `SSO Login`」「debug 補助は `Auth Entry Debug`」という役割だけは崩したくなかった。とはいえ users 詳細は token なしの初回読み込みで detail API error へ落ちやすく、一覧と同じ recovery banner を常に安定表示できるわけではなかった
+- 決定事項: E2E では文言全文を固定せず、users 一覧の live + token なし状態で `Re-auth Flow` 内に `SSO Login` と `Auth Entry Debug` の両方が見えることだけを軽く確認する方針にした。users 詳細については、現時点では recovery banner の存在を別途固定せず、既存の logout/re-login 文脈復帰回帰に委ねる。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 一覧 recovery CTA の回帰基準、users 詳細 recovery banner の今後の扱い
+- 次の推奨アクション: 次は callback stall 再発時の切り分けを少し堅くするため、`readCallbackDebugTrace()` が page close 済みでも failure 要約を壊さないように E2E helper 側の例外吸収を検討する
+
+### callback trace helper は page close 済みでも timeout 要約を壊さない
+
+- 背景: callback stall が単発で再発した時、`waitForSsoArrival()` 自体の timeout より先に `readCallbackDebugTrace()` が `Target page, context or browser has been closed` で落ち、もともとの URL wait failure を読み取りにくくすることがあった。既知 flake の切り分けでは、trace が取れない時でも「page already closed」という診断付きで元の timeout を残す方が引き継ぎしやすい
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の `readCallbackDebugTrace()` を安全化し、page がすでに閉じている時は例外ではなく `unavailable: page already closed` を返すようにした。`waitForSsoArrival()` も current URL を安全に読み、callback 上での timeout か page close 済みの断面なら、元の wait error を `cause` に残したまま `Current URL` と `Callback trace` の要約を組み立てる。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時の failure 要約、今後の triage readability
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `test:sso:triage` の summary と新しい helper 要約が噛み合うかを見て、必要なら `Current URL` / `Callback trace` の wording をもう一段短くする
+
+### callback helper の文面は triage summary と重複しすぎないよう圧縮する
+
+- 背景: `test:sso:triage` 側はすでに `Callback latest stage` や trace 件数を要約してくれるため、helper 側まで説明文を増やしすぎると、再発時ログで同じ情報が重複して見えやすかった。helper には「どの path を待っていたか」「callback URL はどこだったか」「trace 生データは取れたか」だけ残っていれば十分だった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の timeout 要約を短くし、先頭行は `SSO callback timeout while waiting for ...`、URL 行は `Callback URL: ...` に寄せ、`SSO debug enabled` の 1 行は削除した。`Callback trace:` の prefix だけは triage script が拾うため維持する。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時のログ可読性、`print-callback-trace-summary.mjs` と helper 文面の役割分担
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `test:sso:triage` を流し、新しい helper 文面と `callback-triage-summary.txt` の要約が読みやすく噛み合っているかを実例で確認する
+
+### callback triage の読み味は fixture selfcheck で先に確認できる
+
+- 背景: 次の推奨アクションは本来 callback stall の実再発待ちだったが、再発待ちのままだと helper 文面と `callback-triage-summary.txt` の相性確認が進まなかった。まずは sample failure log で、helper の `Callback trace:` 行と triage summary の `Callback latest stage` が過不足なく並ぶかを先に見ておきたかった
+- 決定事項: `e2e/scripts/selfcheck-callback-triage.sh` と `pnpm --dir e2e run selfcheck:callback-triage` を追加し、圧縮済み helper 文面を含む sample timeout log から `print-callback-trace-summary.mjs` の出力を自己確認できるようにした。selfcheck は `Callback trace count: 3`、`Callback latest stage: callback:token-exchange:error`、`Callback latest at: ...` まで検証し、実行結果は pass した
+- 影響範囲: `e2e/scripts/selfcheck-callback-triage.sh`、`e2e/package.json`、callback triage wording の事前確認手順、再発待ち前の自己検証
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `pnpm --dir e2e run test:sso:triage` を流し、実ログでも selfcheck と同じ読み味になっているかを確認する
+
+### `test:sso:triage` は現時点では standard pass のまま維持できている
+
+- 背景: selfcheck で helper 文面と triage summary の読み味は先に確認できたが、実スタック側でも現時点の `test:sso:triage` がどう振る舞うかは別途見ておきたかった。callback stall が再発していない状態でも、standard run がそのまま pass するなら「再発時の入口はこのままでよい」と明示できる
+- 決定事項: `pnpm --dir e2e run test:sso:triage` を実行し、Playwright 公式コンテナの standard run が `6 passed`、debug rerun なしで終了することを確認した。現時点では triage 自体の導線に問題はなく、callback stall が実再発した時だけ同じ入口から debug rerun と summary 採取へ進めばよい
+- 影響範囲: `e2e/scripts/run-sso-triage.sh` の現運用、callback stall 未再発時の期待値、次回 triage 開始条件
+- 次の推奨アクション: 次は callback stall の実再発を待ち、再発した時点で `pnpm --dir e2e run test:sso:triage` を流して helper 文面と `callback-triage-summary.txt` の実ログ上の噛み合いを確認する
