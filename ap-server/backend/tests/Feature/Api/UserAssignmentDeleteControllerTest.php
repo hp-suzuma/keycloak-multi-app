@@ -65,10 +65,11 @@ class UserAssignmentDeleteControllerTest extends CreateAuthorizationApiTestCase
 
         $response->assertNoContent();
 
-        $this->assertDatabaseMissing('user_role_assignments', [
+        $this->assertDatabaseHas('user_role_assignments', [
             'keycloak_sub' => $user->keycloak_sub,
             'scope_id' => $scope->id,
             'role_id' => $role->id,
+            'is_deleted' => true,
         ]);
     }
 
@@ -134,8 +135,9 @@ class UserAssignmentDeleteControllerTest extends CreateAuthorizationApiTestCase
 
         $response->assertNoContent();
 
-        $this->assertDatabaseMissing('user_role_assignments', [
+        $this->assertDatabaseHas('user_role_assignments', [
             'id' => $assignment->id,
+            'is_deleted' => true,
         ]);
     }
 

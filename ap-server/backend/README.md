@@ -1784,3 +1784,10 @@ php artisan test
 - 決定事項: `GET /api/me/authorization` の `authorization` には既存の `assignments` と `permissions` を残したまま、permission slug ごとの `permission_scopes` を追加する。各 permission には `granted_scope_ids` と `accessible_scope_ids` を持たせ、前者は direct grant、後者は descendant を含む実効 access として扱う
 - 影響範囲: `AuthorizationService` の response 形式、`tests/Feature/Api/MeAuthorizationControllerTest.php`、今後 frontend が認可の根拠表示や drill-down 補助を足す時の参照契約、`ap-server/backend/README.md`
 - 次の推奨アクション: 次に frontend 側へ認可根拠表示を足すなら、まずは `permission_scopes` を debug / 補助表示に限定して使い、メニュー切り替えの一次判定は引き続き `authorization.permissions` で簡潔に保つ
+
+### AP backend の業務テーブルは `BaseModel + boolean soft delete` 前提で統一する
+
+- 背景: 今後 `objects` / `policies` などの CRUD を深掘る前に、既存テーブル都合として `created_by`, `created_at`, `updated_by`, `updated_at`, `is_deleted` を Laravel 標準より優先して扱う必要が出た。新規テーブルを Laravel 標準へ寄せる選択は取れないため、互換処理を model 層へ閉じ込めておかないと、各 service や controller ごとに監査列や論理削除の扱いが散らばりやすかった
+- 決定事項: AP backend の業務テーブルは `App\Models\BaseModel` を継承し、`HasAuditColumns` trait を使う `BaseModel::performInsert / performUpdate` で `created_by` / `updated_by` を共通設定する。論理削除は Laravel 標準 `SoftDeletes` を使わず、`HasBooleanSoftDeletes` で `is_deleted = false` の global scope と `delete()/restore()` を提供する。unique 制約は active row (`is_deleted = false`) だけに掛かる partial unique index 前提へ切り替え、削除後の再作成を阻害しない
+- 影響範囲: `app/Models/BaseModel.php`、`app/Models/Concerns/HasAuditColumns.php`、`app/Models/Concerns/HasBooleanSoftDeletes.php`、AP 系 model 全般、authorization/resource migration、delete 系 test、今後の CRUD 実装方針
+- 次の推奨アクション: 次に CRUD を進める時は、1) 新しい AP テーブルも同じ監査列と partial unique index を持たせる、2) delete 後の再作成と restore のどちらを UI 主導線にするか resource ごとに決める、3) `role_permissions` のような pivot 系更新で `syncWithPivotValues()` を使う方針を崩さない

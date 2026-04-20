@@ -227,16 +227,18 @@ class UserAssignmentStoreControllerTest extends CreateAuthorizationApiTestCase
                 ),
             ]);
 
-        $this->assertDatabaseMissing('user_role_assignments', [
+        $this->assertDatabaseHas('user_role_assignments', [
             'keycloak_sub' => 'managed-user-reassign',
             'scope_id' => $scope->id,
             'role_id' => $viewerRole->id,
+            'is_deleted' => true,
         ]);
 
         $this->assertDatabaseHas('user_role_assignments', [
             'keycloak_sub' => 'managed-user-reassign',
             'scope_id' => $scope->id,
             'role_id' => $operatorRole->id,
+            'is_deleted' => false,
         ]);
     }
 

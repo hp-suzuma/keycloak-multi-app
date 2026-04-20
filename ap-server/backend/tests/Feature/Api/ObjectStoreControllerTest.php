@@ -57,18 +57,17 @@ class ObjectStoreControllerTest extends CreateAuthorizationApiTestCase
                 'name' => 'Object C',
             ]);
 
+        $objectId = $response->json('data.id');
+
         $response
             ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => 1,
-                    'scope_id' => $tenantScope->id,
-                    'code' => 'object-c',
-                    'name' => 'Object C',
-                ],
-            ]);
+            ->assertJsonPath('data.id', $objectId)
+            ->assertJsonPath('data.scope_id', $tenantScope->id)
+            ->assertJsonPath('data.code', 'object-c')
+            ->assertJsonPath('data.name', 'Object C');
 
         $this->assertDatabaseHas('objects', [
+            'id' => $objectId,
             'scope_id' => $tenantScope->id,
             'code' => 'object-c',
             'name' => 'Object C',

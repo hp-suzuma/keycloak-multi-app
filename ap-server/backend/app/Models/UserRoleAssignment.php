@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBooleanSoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['keycloak_sub', 'role_id', 'scope_id'])]
-class UserRoleAssignment extends Model
+class UserRoleAssignment extends BaseModel
 {
+    use HasBooleanSoftDeletes;
+
     /**
      * @return BelongsTo<ApUser, $this>
      */

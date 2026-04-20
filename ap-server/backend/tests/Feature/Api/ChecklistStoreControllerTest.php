@@ -20,9 +20,10 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'Tenant Checklist',
             ));
 
-        $this->assertChecklistResponse($response, 1, $scope->id, 'tenant-checklist', 'Tenant Checklist');
+        $this->assertChecklistResponse($response, $scope->id, 'tenant-checklist', 'Tenant Checklist');
 
         $this->assertDatabaseHas('checklists', [
+            'id' => $response->json('data.id'),
             'scope_id' => $scope->id,
             'code' => 'tenant-checklist',
         ]);
@@ -60,18 +61,16 @@ class ChecklistStoreControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
-    private function assertChecklistResponse($response, int $checklistId, int $scopeId, string $code, string $name): void
+    private function assertChecklistResponse($response, int $scopeId, string $code, string $name): void
     {
+        $checklistId = $response->json('data.id');
+
         $response
             ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $checklistId,
-                    'scope_id' => $scopeId,
-                    'code' => $code,
-                    'name' => $name,
-                ],
-            ]);
+            ->assertJsonPath('data.id', $checklistId)
+            ->assertJsonPath('data.scope_id', $scopeId)
+            ->assertJsonPath('data.code', $code)
+            ->assertJsonPath('data.name', $name);
     }
 
     /**

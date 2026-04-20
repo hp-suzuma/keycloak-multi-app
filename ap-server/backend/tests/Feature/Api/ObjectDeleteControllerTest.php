@@ -70,8 +70,9 @@ class ObjectDeleteControllerTest extends CreateAuthorizationApiTestCase
 
         $response->assertNoContent();
 
-        $this->assertDatabaseMissing('objects', [
+        $this->assertDatabaseHas('objects', [
             'id' => $managedObject->id,
+            'is_deleted' => true,
         ]);
     }
 
