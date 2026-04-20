@@ -8,6 +8,7 @@ const usersDetailPath = '/users/tenant-user-b?service_scope_id=2&tenant_scope_id
 const usersDetailWithKeywordPath = '/users/tenant-user-b?service_scope_id=2&tenant_scope_id=3&keyword=bob&sort=-email'
 const serviceOnlyUsersDetailAlicePath = '/users/tenant-user-a?service_scope_id=2&keyword=alice&sort=-email'
 const authEntryPath = '/?logged_out=1#auth-entry'
+const ssoDebugEnabled = process.env.PLAYWRIGHT_SSO_DEBUG === '1'
 
 async function submitKeycloakLogin(page: Page) {
   await page.locator('input[name="username"]').fill(process.env.KEYCLOAK_USERNAME ?? 'alice')
@@ -17,18 +18,50 @@ async function submitKeycloakLogin(page: Page) {
 
 function buildGlobalSsoLoginUrl(nextPath = usersPath) {
   const globalLoginUrl = new URL('https://global.example.com/login')
+  const returnToUrl = new URL('https://ap.example.com/auth/bridge')
+  returnToUrl.searchParams.set('next', nextPath)
+
+  if (ssoDebugEnabled) {
+    returnToUrl.searchParams.set('sso_debug', '1')
+  }
+
   globalLoginUrl.searchParams.set(
     'return_to',
-    `https://ap.example.com/auth/bridge?next=${encodeURIComponent(nextPath)}`
+    returnToUrl.toString()
   )
 
   return globalLoginUrl.toString()
 }
 
+async function readCallbackDebugTrace(page: Page) {
+  return page.evaluate(() => sessionStorage.getItem('ap-sso-debug-trace'))
+}
+
+async function waitForSsoArrival(page: Page, nextPath: string) {
+  try {
+    await page.waitForURL(`**${nextPath}`)
+  } catch (error) {
+    if (page.url().includes('/auth/callback')) {
+      const trace = await readCallbackDebugTrace(page)
+      throw new Error(
+        [
+          `SSO callback did not finish while waiting for ${nextPath}.`,
+          `Current URL: ${page.url()}`,
+          `SSO debug enabled: ${ssoDebugEnabled}`,
+          `Callback trace: ${trace ?? 'missing'}`
+        ].join('\n'),
+        { cause: error }
+      )
+    }
+
+    throw error
+  }
+}
+
 async function loginViaGlobalSso(page: Page, nextPath = usersPath) {
   await page.goto(buildGlobalSsoLoginUrl(nextPath))
   await submitKeycloakLogin(page)
-  await page.waitForURL(`**${nextPath}`)
+  await waitForSsoArrival(page, nextPath)
 }
 
 async function openUserMenu(page: Page) {

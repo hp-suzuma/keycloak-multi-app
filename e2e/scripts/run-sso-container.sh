@@ -15,6 +15,7 @@ exec docker run --rm \
   -e PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-https://ap.example.com}" \
   -e KEYCLOAK_USERNAME="${KEYCLOAK_USERNAME:-alice}" \
   -e KEYCLOAK_PASSWORD="${KEYCLOAK_PASSWORD:-password}" \
+  -e PLAYWRIGHT_SSO_DEBUG="${PLAYWRIGHT_SSO_DEBUG:-0}" \
   -e PLAYWRIGHT_WAIT_TIMEOUT_MS="${PLAYWRIGHT_WAIT_TIMEOUT_MS:-120000}" \
   -e PLAYWRIGHT_WAIT_INTERVAL_MS="${PLAYWRIGHT_WAIT_INTERVAL_MS:-3000}" \
   -e PLAYWRIGHT_HOST_MAP="${PLAYWRIGHT_HOST_MAP:-ap.example.com=127.0.0.1,global.example.com=127.0.0.1,keycloak.example.com=127.0.0.1,ap-backend-fpm.example.com=127.0.0.1}" \

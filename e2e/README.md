@@ -266,6 +266,20 @@ pnpm --dir e2e test:headed
 - 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の現状維持、callback flake の今後の扱い
 - 次の推奨アクション: 次はこのテーマを一区切りとして別作業へ進むか、callback timeout 再発時の調査用メモを別途足すかを決める
 
+### callback timeout の再発調査は `?sso_debug=1` の browser trace を先に見る
+
+- 背景: callback timeout は browser 上では `auth/callback` 停滞としてしか見えにくく、Playwright artifact が残らない再実行成功ケースでは「Keycloak token exchange と AP API refresh のどちらで詰まったか」が会話ログだけでは引き継ぎにくかった
+- 決定事項: 今後 callback timeout が再発した時の最初の切り分けは、通常 spec を増やすより先に `?sso_debug=1` を一度有効化した tab で同じ SSO 導線を踏み、callback error 画面の `Latest Stage` を確認する。より詳しく見る時は browser の `sessionStorage["ap-sso-debug-trace"]` を開く。debug flag は同じ tab の users/detail/logout/re-login にも持ち回るので、trace の `callback:token-exchange:*` と `callback-page:refresh-current-user:*` を見れば timeout 箇所を browser-only で切り分けられる。不要になったら `?sso_debug=0` で解除する
+- 影響範囲: AP Frontend callback flake の再調査手順、`e2e/tests/ap-frontend-sso-recovery.spec.ts` をすぐ改変しない判断基準、users/detail 文脈の debug 再現性
+- 次の推奨アクション: 次回再発時は callback error 画面の `Latest Stage` か trace の最終 stage を README に追記し、その結果が token exchange 側なら callback 観測強化、refresh 側なら API 待機や auth recovery 文言整理へ進む
+
+### callback stall が再発したので E2E から debug trace を引けるようにした
+
+- 背景: callback summary UI を追加した直後の Playwright 公式コンテナ再実行で、`tests/ap-frontend-sso-recovery.spec.ts:63` の最初の login case だけが再び `auth/callback` 停滞で timeout した。ただし通常回帰では `sso_debug` を付けていないため、artifact だけでは stage を特定しにくかった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` に `PLAYWRIGHT_SSO_DEBUG=1` を追加で渡せる入口を設け、SSO login URL に `sso_debug=1` を載せられるようにした。さらに login helper の URL wait は、`/auth/callback` 上で timeout した時に `sessionStorage["ap-sso-debug-trace"]` を読み出して error に添える形へ変更した。加えて再発時の入口コマンドを `pnpm --dir e2e run test:sso:debug` に固定し、env を手で前置しなくても trace 付き再実行へ入れるようにした。通常回帰の失敗直後に自動で debug rerun まで進めたい時は `pnpm --dir e2e run test:sso:triage` を使い、triage script 自体が `Callback latest stage` まで要約して `e2e/test-results/callback-triage-summary.txt` にも保存する
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Playwright container での callback stall 切り分け、今後の一時 debug 実行手順
+- 次の推奨アクション: 次回 callback stall が再発したら、まず `pnpm --dir e2e run test:sso:triage` を流して standard failure と debug rerun をまとめて取り、`e2e/test-results/callback-triage-summary.txt` の `Callback latest stage` を README に追記する
+
 ## 補足
 
 - `PLAYWRIGHT_BASE_URL` を変えれば別 host でも流せる

@@ -12,21 +12,62 @@ const {
 const {
   completeBridgeSession,
   globalLoginUrl,
-  clearStoredState
+  clearStoredState,
+  appendSsoDebugTrace,
+  readSsoDebugTrace,
+  summarizeSsoDebugTrace
 } = useApSso()
 
 const next = computed(() => typeof route.query.next === 'string' ? route.query.next : '/')
 const errorMessage = ref<string | null>(null)
+const debugTraceEnabled = ref(false)
+const debugTraceSummary = ref<ReturnType<typeof summarizeSsoDebugTrace> | null>(null)
+const debugHint = computed(() =>
+  debugTraceEnabled.value
+    ? '`sessionStorage["ap-sso-debug-trace"]` を見ると callback trace を確認できます。'
+    : null
+)
 
 onMounted(async () => {
+  debugTraceEnabled.value
+    = route.query.sso_debug === '1'
+      || readSsoDebugTrace().length > 0
+
   try {
+    if (debugTraceEnabled.value) {
+      appendSsoDebugTrace('callback-page:mounted', {
+        next: next.value
+      })
+    }
+
     const result = await completeBridgeSession()
+    if (debugTraceEnabled.value) {
+      appendSsoDebugTrace('callback-page:token-ready', {
+        next: result.next
+      })
+    }
     setMode('live')
     setBearerToken(result.accessToken)
+    if (debugTraceEnabled.value) {
+      appendSsoDebugTrace('callback-page:refresh-current-user:start')
+    }
     await refreshCurrentUser()
+    if (debugTraceEnabled.value) {
+      appendSsoDebugTrace('callback-page:refresh-current-user:done')
+      appendSsoDebugTrace('callback-page:navigate:start', {
+        next: result.next
+      })
+    }
     await navigateTo(result.next, { replace: true })
   } catch (error) {
     clearStoredState()
+    if (debugTraceEnabled.value) {
+      appendSsoDebugTrace('callback-page:error', {
+        message: error instanceof Error ? error.message : String(error),
+        traceLength: readSsoDebugTrace().length
+      })
+      debugTraceSummary.value = summarizeSsoDebugTrace()
+    }
     errorMessage.value = error instanceof Error
       ? error.message
       : 'AP Frontend の auth callback で token を確定できませんでした。'
@@ -58,6 +99,22 @@ onMounted(async () => {
           class="rounded-2xl border border-error/30 bg-error/10 p-4 text-sm text-error"
         >
           <p>{{ errorMessage }}</p>
+          <p
+            v-if="debugHint"
+            class="mt-2 text-xs text-error/80"
+          >
+            {{ debugHint }}
+          </p>
+          <div
+            v-if="debugTraceSummary?.latestStage"
+            class="mt-3 rounded-xl border border-error/20 bg-white/40 p-3 text-xs text-error/90"
+          >
+            <p>Latest Stage: {{ debugTraceSummary.latestStage }}</p>
+            <p>Trace Count: {{ debugTraceSummary.count }}</p>
+            <p v-if="debugTraceSummary.latestAt">
+              Latest At: {{ debugTraceSummary.latestAt }}
+            </p>
+          </div>
           <div class="mt-4 flex flex-wrap gap-2">
             <UButton
               :to="globalLoginUrl(next)"

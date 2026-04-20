@@ -562,3 +562,17 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: `2026-04-20` 時点では login/callback timeout は「単発で見えたが直近の再実行では再現していない軽微な flake」と扱い、追加実装は入れない。browser 回帰の成功ラインは引き続き Playwright 公式コンテナでの `5 passed` とする。再発した時だけ `/auth/callback` の token exchange と `refreshCurrentUser()` の完了観測を増やす
 - 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の現状維持、`ap-server/frontend/app/pages/auth/callback.vue` への追加観測タイミング、今後の flake 切り分け方針
 - 次の推奨アクション: 次はこの SSO recovery 一連の到達点を区切りとして、必要なら別テーマへ移る。callback timeout が再発した時は `auth/callback` と `useApSso.completeBridgeSession()` の観測追加から再開する
+
+### callback timeout 再発時だけ `?sso_debug=1` で trace を残す
+
+- 背景: callback timeout の再現性はまだ薄く、常時ログや UI 常設の debug 表示を入れると通常の SSO recovery 導線へノイズが増える。一方で再発時には、`token exchange` で止まったのか、`refreshCurrentUser()` で止まったのかをブラウザ側だけで即座に切り分けたい
+- 決定事項: `auth/callback` と `useApSso.completeBridgeSession()` には常時観測を入れず、`?sso_debug=1` を一度踏んだ tab だけ `sessionStorage["ap-sso-debug-trace"]` に段階 trace を残す。debug 有効化は同じ tab の users/detail/logout/re-login 導線にも持ち回り、必要なら `?sso_debug=0` で解除する。callback では `callback:received`、`callback:token-exchange:start|done|error`、`callback-page:refresh-current-user:start|done` など最小限の stage だけを積み、error 画面にも `Latest Stage` と trace 件数を表示する
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/pages/auth/callback.vue`、callback timeout 再発時の browser-only 切り分け手順、users/detail 文脈での debug 再現性
+- 次の推奨アクション: 再発したら該当 tab で一度 `?sso_debug=1` を付けてから同じ導線を踏み、failure 時は callback error 画面の `Latest Stage` を先に確認し、必要なら DevTools の `sessionStorage["ap-sso-debug-trace"]` で全 trace を見て README へ追記する
+
+### callback stall 再発時の E2E 入口は `PLAYWRIGHT_SSO_DEBUG=1` に寄せる
+
+- 背景: callback summary UI を足した直後の Playwright 公式コンテナ再実行で、最初の login case が再び `auth/callback` 停滞で timeout した。通常回帰は `sso_debug` なしで流しているため、そのままだと frontend 側の trace を test failure に載せられない
+- 決定事項: callback stall の再発確認は browser 手動確認だけでなく、E2E 側でも `PLAYWRIGHT_SSO_DEBUG=1` を使って同じ trace を採れる前提に寄せる。Playwright helper はこの env が有効な時だけ `sso_debug=1` を載せ、`/auth/callback` で timeout した場合は `sessionStorage["ap-sso-debug-trace"]` を failure に添える。再発時の container 入口は `pnpm --dir e2e run test:sso:debug` に固定し、さらに standard run が落ちた直後に debug rerun まで自動で進める `pnpm --dir e2e run test:sso:triage` も追加した。triage script は `Callback trace` の JSON から `Callback latest stage` まで自動で要約し、`e2e/test-results/callback-triage-summary.txt` に保存する
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/scripts/run-sso-triage.sh`、frontend callback trace の再利用先、今後の callback stall 調査手順
+- 次の推奨アクション: 次回 callback stall が再発したら、まず `pnpm --dir e2e run test:sso:triage` を流して standard failure と debug rerun をまとめて取り、`e2e/test-results/callback-triage-summary.txt` の `Callback latest stage` を README へ追記する

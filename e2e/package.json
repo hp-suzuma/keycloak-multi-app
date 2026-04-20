@@ -17,6 +17,8 @@
     "test:sso": "playwright test tests/ap-frontend-sso-recovery.spec.ts",
     "test:sso:auto": "bash ./scripts/run-sso-auto.sh",
     "test:sso:container": "bash ./scripts/run-sso-container.sh",
+    "test:sso:debug": "PLAYWRIGHT_SSO_DEBUG=1 bash ./scripts/run-sso-container.sh",
+    "test:sso:triage": "bash ./scripts/run-sso-triage.sh",
     "test:headed": "playwright test --headed",
     "codegen": "playwright codegen https://ap.example.com",
     "install:browsers": "playwright install --with-deps chromium"
