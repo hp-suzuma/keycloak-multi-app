@@ -27,6 +27,8 @@ const isSubmitting = ref(false)
 const isRecommendedApiBase = computed(() => apiBase.value === RECOMMENDED_AP_API_BASE)
 const hasUserManagePermission = computed(() => authorization.value?.permissions.includes('user.manage') ?? false)
 const isLoggedOutRedirect = computed(() => route.query.logged_out === '1')
+const shouldShowSsoLogin = computed(() => mode.value === 'live' || isLoggedOutRedirect.value)
+const shouldShowSsoLogout = computed(() => mode.value === 'live' && !isLoggedOutRedirect.value)
 const authRecoveryTitle = computed(() => {
   if (authRecoveryKind.value === 'setup') {
     return 'Session Setup'
@@ -124,6 +126,10 @@ async function signOutFromSso() {
 }
 
 onMounted(async () => {
+  if (isLoggedOutRedirect.value && mode.value !== 'live') {
+    setMode('live')
+  }
+
   if (status.value === 'idle') {
     await refreshCurrentUser()
   }
@@ -221,10 +227,11 @@ onMounted(async () => {
             live 検証で使っている Keycloak token は 5 分程度で期限切れになります。users 一覧 / 詳細 / assignment 操作を続けて確認する時は、先に token を更新しておくと切り分けがぶれません。
           </p>
           <div
-            v-if="mode === 'live'"
+            v-if="shouldShowSsoLogin || shouldShowSsoLogout"
             class="mt-4 flex flex-wrap gap-2"
           >
             <UButton
+              v-if="shouldShowSsoLogin"
               :to="globalLoginUrl"
               color="primary"
               variant="soft"
@@ -233,6 +240,7 @@ onMounted(async () => {
               SSO Login
             </UButton>
             <UButton
+              v-if="shouldShowSsoLogout"
               color="neutral"
               variant="soft"
               trailing-icon="i-lucide-log-out"
@@ -244,7 +252,7 @@ onMounted(async () => {
         </div>
 
         <div
-          v-if="mode === 'live' && isLoggedOutRedirect"
+          v-if="isLoggedOutRedirect"
           class="rounded-2xl border border-success/30 bg-success/10 p-4 dark:border-success/20"
         >
           <p class="text-xs uppercase tracking-[0.18em] text-muted">

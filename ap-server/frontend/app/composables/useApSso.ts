@@ -18,6 +18,14 @@ interface CompleteBridgeSessionResult {
   next: string
 }
 
+function normalizeStoredNextPath(next: string | null | undefined): string | null {
+  if (!next || !next.startsWith('/')) {
+    return null
+  }
+
+  return normalizeNextPath(next, '/')
+}
+
 function normalizeNextPath(next: string | undefined, fallback = '/'): string {
   if (!next || !next.startsWith('/')) {
     return fallback
@@ -49,6 +57,17 @@ async function sha256(value: string): Promise<Uint8Array> {
 export function useApSso() {
   const config = useRuntimeConfig()
   const route = useRoute()
+  const logoutReturnNextCookie = useCookie<string | null>(
+    LOGOUT_RETURN_NEXT_STORAGE_KEY,
+    {
+      sameSite: 'lax',
+      default: () => null
+    }
+  )
+  const storedLogoutReturnNext = useState<string | null>(
+    'ap-sso-logout-return-next',
+    () => normalizeStoredNextPath(logoutReturnNextCookie.value)
+  )
 
   const frontendBaseUrl = computed(() => config.public.apFrontendBaseUrl)
   const globalLoginBaseUrl = computed(() => config.public.apGlobalLoginUrl)
@@ -59,18 +78,30 @@ export function useApSso() {
     return normalizeNextPath(route.fullPath, '/')
   }
 
+  function syncStoredLogoutReturnNext() {
+    if (!import.meta.client) {
+      storedLogoutReturnNext.value = normalizeStoredNextPath(
+        logoutReturnNextCookie.value
+      )
+      return storedLogoutReturnNext.value
+    }
+
+    const localValue = normalizeStoredNextPath(
+      localStorage.getItem(LOGOUT_RETURN_NEXT_STORAGE_KEY)
+    )
+    const cookieValue = normalizeStoredNextPath(logoutReturnNextCookie.value)
+    storedLogoutReturnNext.value = localValue ?? cookieValue
+    logoutReturnNextCookie.value = storedLogoutReturnNext.value
+
+    return storedLogoutReturnNext.value
+  }
+
   function readStoredLogoutReturnNext(): string | null {
     if (!import.meta.client) {
-      return null
+      return storedLogoutReturnNext.value
     }
 
-    const raw = localStorage.getItem(LOGOUT_RETURN_NEXT_STORAGE_KEY)
-
-    if (!raw) {
-      return null
-    }
-
-    return normalizeNextPath(raw, '/')
+    return storedLogoutReturnNext.value ?? syncStoredLogoutReturnNext()
   }
 
   function storeLogoutReturnNext(next = currentNextPath()) {
@@ -82,9 +113,14 @@ export function useApSso() {
       LOGOUT_RETURN_NEXT_STORAGE_KEY,
       normalizeNextPath(next, '/')
     )
+    storedLogoutReturnNext.value = normalizeNextPath(next, '/')
+    logoutReturnNextCookie.value = storedLogoutReturnNext.value
   }
 
   function clearStoredLogoutReturnNext() {
+    storedLogoutReturnNext.value = null
+    logoutReturnNextCookie.value = null
+
     if (!import.meta.client) {
       return
     }
@@ -132,6 +168,10 @@ export function useApSso() {
     logoutUrl.searchParams.set('return_to', returnTo)
 
     return logoutUrl.toString()
+  }
+
+  if (import.meta.client) {
+    syncStoredLogoutReturnNext()
   }
 
   function readStoredState(): PkceSessionState | null {
