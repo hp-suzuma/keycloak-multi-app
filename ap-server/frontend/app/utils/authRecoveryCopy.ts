@@ -1,5 +1,5 @@
 type AuthRecoveryKind = 'none' | 'setup' | 'refresh' | 'retry'
-type AuthRecoverySurface = 'auth-entry' | 'users-index' | 'users-detail'
+type AuthRecoverySurface = 'auth-entry' | 'users-index' | 'users-detail' | 'operations-index'
 
 interface AuthRecoveryCopyOptions {
   errorMessage?: string | null
@@ -21,6 +21,10 @@ function getSurfaceLabel(surface: AuthRecoverySurface) {
     return 'users 詳細'
   }
 
+  if (surface === 'operations-index') {
+    return 'Operations 一覧'
+  }
+
   return 'Auth Entry'
 }
 
@@ -31,6 +35,10 @@ function getFailureLabel(surface: AuthRecoverySurface) {
 
   if (surface === 'users-detail') {
     return 'assignment 系 API や users 詳細 API'
+  }
+
+  if (surface === 'operations-index') {
+    return 'objects / policies API'
   }
 
   return 'live API'

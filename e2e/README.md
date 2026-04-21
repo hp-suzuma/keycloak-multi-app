@@ -333,6 +333,20 @@ pnpm --dir e2e test:headed
 
 ## 補足
 
+### objects / policies の browser 回帰は users spec から分離する
+
+- 背景: `objects` / `policies` は `object.read` ベースの Operations 導線として今後育てていく一方、既存の `ap-frontend-sso-recovery.spec.ts` は users 一覧・詳細・assignment 文脈の query recovery まで持っており、そこへ同居させると failure 時の切り分けが読みにくくなりやすかった
+- 決定事項: browser 回帰は users 系と Operations 系で spec を分ける。`e2e/tests/ap-frontend-sso-recovery.spec.ts` は users query / detail recovery 専用として維持し、`e2e/tests/ap-frontend-operations-sso-recovery.spec.ts` を追加して `objects` / `policies` の導線表示と logout / re-login 後に同じ page へ戻ることを確認する。実行入口は `pnpm --dir e2e run test:sso` で両方、個別確認は `test:sso:users` と `test:sso:operations` を使う
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/tests/ap-frontend-operations-sso-recovery.spec.ts`、`e2e/package.json` の SSO 実行スクリプト、今後の AP Frontend browser 回帰の責務分離
+- 次の推奨アクション: 次は Operations spec を土台に、`objects` / `policies` に一覧取得や scope filter が入ったタイミングで placeholder assertion を API 接続後の一覧 assertion へ置き換えていく
+
+### objects は placeholder ではなく最小一覧を回帰対象にする
+
+- 背景: Operations spec を分離した時点では `objects` も placeholder card を見ていたが、実装の先行対象を `objects` に決めたことで、browser 回帰も「画面が開く」だけでなく一覧骨格が出ることまで見たくなった
+- 決定事項: `objects` は `GET /api/objects` へつながる最小一覧として `Filter & Sort` と `Objects List` の表示を確認する前提へ更新し、`policies` は引き続き placeholder page として扱う。`test:sso:operations` は objects 側だけ新しい一覧骨格に合わせ、live/mock どちらでも壊れにくい静的見出しを assertion の基準にする
+- 影響範囲: `e2e/tests/ap-frontend-operations-sso-recovery.spec.ts` の objects assertion、今後の Operations 画面実装時の回帰追加単位
+- 次の推奨アクション: 次は `policies` 一覧が入った段階で同じ spec に最小一覧 assertion を足し、objects / policies の両方を placeholder 依存なしで確認できるようにする
+
 - `PLAYWRIGHT_BASE_URL` を変えれば別 host でも流せる
 - Keycloak の認証情報は `KEYCLOAK_USERNAME`, `KEYCLOAK_PASSWORD` で上書きできる
 - `PLAYWRIGHT_WAIT_TIMEOUT_MS`, `PLAYWRIGHT_WAIT_INTERVAL_MS` で stack 待機時間を調整できる

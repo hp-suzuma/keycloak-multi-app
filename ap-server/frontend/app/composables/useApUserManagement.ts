@@ -97,6 +97,38 @@ export interface UserAssignmentMutationInput {
   role_id: number
 }
 
+export interface ManagedObjectItem {
+  id: number
+  scope_id: number
+  code: string
+  name: string
+}
+
+export interface ObjectIndexFilters {
+  scope_id?: number
+  code?: string
+  name?: string
+  sort?: string
+  page?: number
+  per_page?: number
+}
+
+export interface ObjectIndexResponse {
+  data: ManagedObjectItem[]
+  meta: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
+    filters: {
+      scope_id: number | null
+      code: string | null
+      name: string | null
+      sort: string | null
+    }
+  }
+}
+
 const rootScope: ScopeItem = { id: 1, layer: 'server', code: 'ap-root', name: 'AP Root', parent_scope_id: null }
 const serviceAlphaScope: ScopeItem = { id: 11, layer: 'service', code: 'svc-alpha', name: 'Service Alpha', parent_scope_id: 1 }
 const serviceBetaScope: ScopeItem = { id: 12, layer: 'service', code: 'svc-beta', name: 'Service Beta', parent_scope_id: 1 }
@@ -236,6 +268,15 @@ const mockUsers: UserItem[] = [
   }
 ]
 
+const mockObjects: ManagedObjectItem[] = [
+  { id: 1, scope_id: serviceAlphaScope.id, code: 'service-alpha-catalog', name: 'Service Alpha Catalog' },
+  { id: 2, scope_id: tenantAScope.id, code: 'tenant-a-object', name: 'Tenant A Object' },
+  { id: 3, scope_id: tenantAScope.id, code: 'tenant-a-runner', name: 'Tenant A Runner' },
+  { id: 4, scope_id: tenantBScope.id, code: 'tenant-b-object', name: 'Tenant B Object' },
+  { id: 5, scope_id: serviceBetaScope.id, code: 'service-beta-manifest', name: 'Service Beta Manifest' },
+  { id: 6, scope_id: tenantCScope.id, code: 'tenant-c-object', name: 'Tenant C Object' }
+]
+
 function compareValues(left: string | number | null | undefined, right: string | number | null | undefined): number {
   const normalizedLeft = `${left ?? ''}`.toLowerCase()
   const normalizedRight = `${right ?? ''}`.toLowerCase()
@@ -360,6 +401,47 @@ function filterMockUsers(filters: UserIndexFilters = {}): UserIndexResponse {
         scope_id: filters.scope_id ?? null,
         keycloak_sub: filters.keycloak_sub ?? null,
         keyword: filters.keyword ?? null,
+        sort: filters.sort ?? null
+      }
+    }
+  }
+}
+
+function filterMockObjects(filters: ObjectIndexFilters = {}): ObjectIndexResponse {
+  const page = filters.page ?? 1
+  const perPage = filters.per_page ?? 20
+  const codeKeyword = filters.code?.trim().toLowerCase()
+  const nameKeyword = filters.name?.trim().toLowerCase()
+
+  let objects = [...mockObjects]
+
+  if (typeof filters.scope_id === 'number') {
+    objects = objects.filter(object => object.scope_id === filters.scope_id)
+  }
+
+  if (codeKeyword) {
+    objects = objects.filter(object => object.code.toLowerCase().includes(codeKeyword))
+  }
+
+  if (nameKeyword) {
+    objects = objects.filter(object => object.name.toLowerCase().includes(nameKeyword))
+  }
+
+  const sortedObjects = sortItems(objects, filters.sort, 'code')
+  const total = sortedObjects.length
+  const offset = (page - 1) * perPage
+
+  return {
+    data: sortedObjects.slice(offset, offset + perPage),
+    meta: {
+      current_page: page,
+      per_page: perPage,
+      total,
+      last_page: Math.max(1, Math.ceil(total / perPage)),
+      filters: {
+        scope_id: filters.scope_id ?? null,
+        code: filters.code ?? null,
+        name: filters.name ?? null,
         sort: filters.sort ?? null
       }
     }
@@ -564,6 +646,26 @@ export function useApUserManagement() {
     })
   }
 
+  async function listObjects(filters: ObjectIndexFilters = {}): Promise<ObjectIndexResponse> {
+    if (mode.value === 'mock' || !apiBase.value) {
+      return filterMockObjects(filters)
+    }
+
+    return await $fetch<ObjectIndexResponse>('/objects', {
+      baseURL: apiBase.value,
+      headers: withAuthorizationHeaders(bearerToken.value),
+      query: buildQuery({
+        ...withAuthorizationQuery(bearerToken.value),
+        scope_id: filters.scope_id,
+        code: filters.code,
+        name: filters.name,
+        sort: filters.sort,
+        page: filters.page,
+        per_page: filters.per_page
+      })
+    })
+  }
+
   async function addUserAssignment(keycloakSub: string, input: UserAssignmentMutationInput): Promise<UserShowResponse> {
     if (mode.value === 'mock' || !apiBase.value) {
       return addMockUserAssignment(keycloakSub, input)
@@ -598,6 +700,7 @@ export function useApUserManagement() {
     getUser,
     listScopes,
     listRoles,
+    listObjects,
     addUserAssignment,
     deleteUserAssignment
   }

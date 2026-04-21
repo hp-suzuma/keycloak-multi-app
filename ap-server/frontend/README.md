@@ -258,6 +258,20 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 ### users 詳細の role summary と削除確認 modal でも同じ `user.manage` access 表示を使う
 
 - 背景: 選択中 scope に対する `user.manage` の根拠を一覧や assignment フォームで見せられるようになっても、実際に操作直前で見る `Role Summary` と `Remove Assignment` modal に同じ情報が無いと、画面の場所によって説明が揺れて見えやすかった
+
+### objects / policies の browser 回帰は users 系 spec と分けて育てる
+
+- 背景: 次の browser 回帰対象として `objects` / `policies` を棚卸ししたところ、現状の frontend はどちらも dashboard shell 上の placeholder page で、確認したい主眼は users 一覧・詳細の query recovery ではなく `object.read` による導線表示と page 単位の SSO 復帰だった。既存の users spec にこの責務を足すと、assignment や detail context の失敗と Operations 導線の失敗が混ざって読みづらくなる
+- 決定事項: `objects` / `policies` の browser 回帰は users 系 spec に追加せず、E2E 側で Operations 専用 spec を新設して育てる前提にする。frontend 側の次実装でも、users は scope query / detail recovery、Operations は page 導線 / logout-relogin recovery という分担で考える
+- 影響範囲: `ap-server/frontend/app/pages/objects/index.vue`、`app/pages/policies/index.vue`、dashboard の Operations 導線、`e2e/tests/ap-frontend-operations-sso-recovery.spec.ts` を起点にした今後の browser 回帰設計
+- 次の推奨アクション: 次は `objects` / `policies` のどちらから先に一覧 UI へ着手するかを決め、placeholder card を置き換える最小契約として scope filter・検索・sort のどこまでを最初の実装範囲に含めるかを README に残してから進める
+
+### objects 一覧を Operations 実装の先行対象にし、最初は一覧取得だけに絞る
+
+- 背景: `objects` と `policies` はどちらも `object.read` 前提の resource だが、backend README では `GET /api/objects` の契約が先頭にあり、frontend でも Operations 系の最初の実一覧パターンを 1 つ決めておくと `policies` 以降へ横展開しやすい状態だった。いきなり detail / update まで入れるより、scope filter と code/name 検索を含む一覧取得を先に固めた方が差分も小さく保てる
+- 決定事項: Operations の最初の実装対象は `objects` にする。初回契約は `service_scope_id` / `tenant_scope_id` から `scope_id = tenant ?? service` を組み立て、`code`・`name`・`sort` を query に載せて `GET /api/objects` を叩く最小一覧に限定する。pagination UI や detail/edit 導線はまだ追加せず、`policies` は同じ一覧パターンへ寄せる次段の対象として残す
+- 影響範囲: `ap-server/frontend/app/pages/objects/index.vue`、`app/composables/useApUserManagement.ts` の objects 一覧取得、Operations spec の objects assertion、今後の `policies` 一覧実装方針
+- 次の推奨アクション: 次は `policies` にも同じ一覧骨格を適用するか、先に `objects` の detail / update 導線を足すかを決める。横展開を優先するなら `policies` 一覧、CRUD 深掘りを優先するなら `objects/{id}` 導線の順で進める
 - 決定事項: users 詳細では `Role Summary` に「この scope へ付与する操作の根拠」を、assignment 削除確認 modal に「この削除操作の根拠」を、それぞれ `direct grant` / `descendant access` / `権限なし` の same helper で表示する。users 詳細内の `user.manage` 根拠表示は同じ `permissionScopes` helper に統一する
 - 影響範囲: `ap-server/frontend/app/pages/users/[keycloakSub].vue`、assignment 追加/削除前の認可根拠表示、live mode 手動確認時に見るべき UI 要素、今後の modal / summary パターン再利用
 - 次の推奨アクション: 次は live mode で users 一覧から詳細へ入り、scope 切り替え時に一覧バッジ、assignment フォーム、role summary、削除確認 modal の `user.manage` 表示が同じ文脈で読めるかを通しで確認する
