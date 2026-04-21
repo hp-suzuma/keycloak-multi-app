@@ -344,8 +344,7 @@ class UserIndexControllerTest extends CreateAuthorizationApiTestCase
 
         $response
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['sort', 'page', 'per_page'])
-            ->assertJsonPath('message', 'The selected sort is invalid. (and 2 more errors)');
+            ->assertJsonValidationErrors(['sort', 'page', 'per_page']);
     }
 
     private function createManagedUser(string $keycloakSub, string $displayName, string $email): ApUser

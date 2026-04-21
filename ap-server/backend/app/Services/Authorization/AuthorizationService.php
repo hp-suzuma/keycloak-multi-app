@@ -18,7 +18,11 @@ class AuthorizationService
      *             role: array{id: int, slug: string, name: string, scope_layer: string, permission_role: string},
      *             permissions: array<int, array{id: int, slug: string, name: string}>
      *         }>,
-     *         permissions: array<int, string>
+     *         permissions: array<int, string>,
+     *         permission_scopes: array<string, array{
+     *             granted_scope_ids: array<int, int>,
+     *             accessible_scope_ids: array<int, int>
+     *         }>
      *     }|null
      * }
      */
@@ -89,19 +93,7 @@ class AuthorizationService
             return [];
         }
 
-        return collect($authorization['assignments'])
-            ->filter(function (array $assignment) use ($requiredPermissions): bool {
-                $permissionSlugs = collect($assignment['permissions'])
-                    ->pluck('slug');
-
-                return collect($requiredPermissions)
-                    ->every(fn (string $permission): bool => $permissionSlugs->contains($permission));
-            })
-            ->pluck('scope.id')
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+        return $this->grantedScopeIdsFromAssignments($authorization['assignments'], $requiredPermissions);
     }
 
     /**
@@ -116,31 +108,7 @@ class AuthorizationService
             return [];
         }
 
-        $descendantsByParent = Scope::query()
-            ->get(['id', 'parent_scope_id'])
-            ->groupBy('parent_scope_id');
-
-        $accessibleScopeIds = collect();
-        $queue = $assignmentScopeIds->all();
-
-        while ($queue !== []) {
-            $currentScopeId = array_shift($queue);
-
-            if ($currentScopeId === null || $accessibleScopeIds->contains($currentScopeId)) {
-                continue;
-            }
-
-            $accessibleScopeIds->push($currentScopeId);
-
-            foreach ($descendantsByParent->get($currentScopeId, collect()) as $childScope) {
-                $queue[] = $childScope->id;
-            }
-        }
-
-        return $accessibleScopeIds
-            ->sort()
-            ->values()
-            ->all();
+        return $this->expandScopeIdsWithDescendants($assignmentScopeIds->all());
     }
 
     /**
@@ -151,7 +119,11 @@ class AuthorizationService
      *         role: array{id: int, slug: string, name: string, scope_layer: string, permission_role: string},
      *         permissions: array<int, array{id: int, slug: string, name: string}>
      *     }>,
-     *     permissions: array<int, string>
+     *     permissions: array<int, string>,
+     *     permission_scopes: array<string, array{
+     *         granted_scope_ids: array<int, int>,
+     *         accessible_scope_ids: array<int, int>
+     *     }>
      * }|null
      */
     private function resolveAuthorization(?CurrentUser $currentUser): ?array
@@ -206,13 +178,89 @@ class AuthorizationService
         $effectivePermissions = collect($assignments)
             ->flatMap(fn (array $assignment): array => array_column($assignment['permissions'], 'slug'))
             ->unique()
+            ->sort()
             ->values()
+            ->all();
+
+        $permissionScopes = collect($effectivePermissions)
+            ->mapWithKeys(fn (string $permission): array => [
+                $permission => [
+                    'granted_scope_ids' => $this->grantedScopeIdsFromAssignments($assignments, [$permission]),
+                    'accessible_scope_ids' => $this->expandScopeIdsWithDescendants(
+                        $this->grantedScopeIdsFromAssignments($assignments, [$permission]),
+                    ),
+                ],
+            ])
             ->all();
 
         return [
             'keycloak_sub' => $currentUser->id,
             'assignments' => $assignments,
             'permissions' => $effectivePermissions,
+            'permission_scopes' => $permissionScopes,
         ];
+    }
+
+    /**
+     * @param  array<int, array{
+     *     scope: array{id: int, layer: string, code: string, name: string, parent_scope_id: int|null},
+     *     role: array{id: int, slug: string, name: string, scope_layer: string, permission_role: string},
+     *     permissions: array<int, array{id: int, slug: string, name: string}>
+     * }>  $assignments
+     * @param  array<int, string>  $requiredPermissions
+     * @return array<int, int>
+     */
+    private function grantedScopeIdsFromAssignments(array $assignments, array $requiredPermissions): array
+    {
+        return collect($assignments)
+            ->filter(function (array $assignment) use ($requiredPermissions): bool {
+                $permissionSlugs = collect($assignment['permissions'])
+                    ->pluck('slug');
+
+                return collect($requiredPermissions)
+                    ->every(fn (string $permission): bool => $permissionSlugs->contains($permission));
+            })
+            ->pluck('scope.id')
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $scopeIds
+     * @return array<int, int>
+     */
+    private function expandScopeIdsWithDescendants(array $scopeIds): array
+    {
+        if ($scopeIds === []) {
+            return [];
+        }
+
+        $descendantsByParent = Scope::query()
+            ->get(['id', 'parent_scope_id'])
+            ->groupBy('parent_scope_id');
+
+        $accessibleScopeIds = collect();
+        $queue = $scopeIds;
+
+        while ($queue !== []) {
+            $currentScopeId = array_shift($queue);
+
+            if ($currentScopeId === null || $accessibleScopeIds->contains($currentScopeId)) {
+                continue;
+            }
+
+            $accessibleScopeIds->push($currentScopeId);
+
+            foreach ($descendantsByParent->get($currentScopeId, collect()) as $childScope) {
+                $queue[] = $childScope->id;
+            }
+        }
+
+        return $accessibleScopeIds
+            ->sort()
+            ->values()
+            ->all();
     }
 }

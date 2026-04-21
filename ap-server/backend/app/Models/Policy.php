@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBooleanSoftDeletes;
 use App\Services\Object\ObjectCodeNormalizer;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['scope_id', 'code', 'name'])]
-class Policy extends Model
+class Policy extends BaseModel
 {
+    use HasBooleanSoftDeletes;
+
     public function setCodeAttribute(string $value): void
     {
         $this->attributes['code'] = app(ObjectCodeNormalizer::class)->normalize($value);

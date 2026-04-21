@@ -19,27 +19,27 @@ class AuthorizationServiceTest extends TestCase
     {
         $serverScope = Scope::query()->create([
             'layer' => 'server',
-            'code' => 'srv-a',
+            'code' => 'srv-authz-a',
             'name' => 'Server A',
         ]);
 
         $serviceScope = Scope::query()->create([
             'layer' => 'service',
-            'code' => 'svc-a',
+            'code' => 'svc-authz-a',
             'name' => 'Service A',
             'parent_scope_id' => $serverScope->id,
         ]);
 
         $tenantScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-a',
+            'code' => 'tenant-authz-a',
             'name' => 'Tenant A',
             'parent_scope_id' => $serviceScope->id,
         ]);
 
         $otherScope = Scope::query()->create([
             'layer' => 'server',
-            'code' => 'srv-b',
+            'code' => 'srv-authz-b',
             'name' => 'Server B',
         ]);
 
@@ -64,13 +64,13 @@ class AuthorizationServiceTest extends TestCase
     {
         $serverScope = Scope::query()->create([
             'layer' => 'server',
-            'code' => 'srv-a',
+            'code' => 'srv-authz-c',
             'name' => 'Server A',
         ]);
 
         $serviceScope = Scope::query()->create([
             'layer' => 'service',
-            'code' => 'svc-a',
+            'code' => 'svc-authz-c',
             'name' => 'Service A',
             'parent_scope_id' => $serverScope->id,
         ]);
@@ -98,7 +98,7 @@ class AuthorizationServiceTest extends TestCase
     {
         $tenantScope = Scope::query()->create([
             'layer' => 'tenant',
-            'code' => 'tenant-a',
+            'code' => 'tenant-authz-b',
             'name' => 'Tenant A',
         ]);
 

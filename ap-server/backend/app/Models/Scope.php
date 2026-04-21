@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBooleanSoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['layer', 'code', 'name', 'parent_scope_id'])]
-class Scope extends Model
+class Scope extends BaseModel
 {
+    use HasBooleanSoftDeletes;
+
     /**
      * @return BelongsTo<Scope, $this>
      */

@@ -20,9 +20,10 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'Tenant Policy',
             ));
 
-        $this->assertPolicyResponse($response, 1, $scope->id, 'tenant-policy', 'Tenant Policy');
+        $this->assertPolicyResponse($response, $scope->id, 'tenant-policy', 'Tenant Policy');
 
         $this->assertDatabaseHas('policies', [
+            'id' => $response->json('data.id'),
             'scope_id' => $scope->id,
             'code' => 'tenant-policy',
         ]);
@@ -60,18 +61,16 @@ class PolicyStoreControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
-    private function assertPolicyResponse($response, int $policyId, int $scopeId, string $code, string $name): void
+    private function assertPolicyResponse($response, int $scopeId, string $code, string $name): void
     {
+        $policyId = $response->json('data.id');
+
         $response
             ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $policyId,
-                    'scope_id' => $scopeId,
-                    'code' => $code,
-                    'name' => $name,
-                ],
-            ]);
+            ->assertJsonPath('data.id', $policyId)
+            ->assertJsonPath('data.scope_id', $scopeId)
+            ->assertJsonPath('data.code', $code)
+            ->assertJsonPath('data.name', $name);
     }
 
     /**

@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBooleanSoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Services\Object\ObjectCodeNormalizer;
 
 #[Fillable(['scope_id', 'code', 'name'])]
-class ManagedObject extends Model
+class ManagedObject extends BaseModel
 {
+    use HasBooleanSoftDeletes;
+
     protected $table = 'objects';
 
     public function setCodeAttribute(string $value): void

@@ -1743,6 +1743,20 @@ php artisan test
 - 影響範囲: `GET /api/users`, `GET /api/scopes` の拡張優先順位、`ap-server/frontend/README.md` の users UI 前提、CurrentUser / token 受け口を追加する次工程、`ap-server/backend/README.md`
 - 次の推奨アクション: 次は frontend 側で CurrentUser または Bearer token の受け口を 1 箇所に寄せ、`mock` から `live` へ切り替えても `GET /api/users`, `GET /api/users/{keycloakSub}`, `GET /api/scopes` を同じ画面で確認できるようにする
 
+### AP Frontend の SSO bridge では `global-login` と `ap-frontend` の両 token audience を受け入れる
+
+- 背景: AP Frontend に `global login -> /auth/bridge -> /auth/callback` の SSO bridge を追加すると、bridge 後に browser が保持する access token の `azp` は `ap-frontend` になる。一方、live の `ap-backend` は `KEYCLOAK_CLIENT_ID=global-login` 前提のままだったため、実際に bridge で取った token を `GET /api/me` へ流すと `current_user: null` になり、AP Frontend の自然復帰が最後で詰まった
+- 決定事項: backend の Keycloak token resolver は単一 `KEYCLOAK_CLIENT_ID` 固定ではなく、`KEYCLOAK_ACCEPTED_CLIENT_IDS` で複数 audience / `azp` を受け入れる。live の AP backend 既定値は `global-login,ap-frontend` とし、従来の debug token と AP Frontend bridge token の両方を同じ `/api/me*` / `/api/users*` 系で扱えるようにする
+- 影響範囲: `ap-server/backend/config/services.php`、`app/Services/Auth/KeycloakTokenCurrentUserResolver.php`、`docker/env/ap-backend.env`、AP Frontend の SSO bridge live 実測、今後 app-a / app-b token を追加で許可する時の env 運用
+- 次の推奨アクション: 次は `docker compose up -d --force-recreate ap-backend ap-backend-fpm nginx` で accepted client ids を反映し、AP Frontend bridge で取った `ap-frontend` token が `GET /api/me` と `GET /api/me/authorization` を live で解決できることを確認する
+
+### live の AP Frontend bridge token でも `GET /api/me*` は `Alice A` を返せる
+
+- 背景: accepted client ids を追加したあとも、実 token で確認しない限り「env を足しただけで本当に bridge token が通るのか」は断言できなかった。特に AP Frontend 側の bridge は `prompt=none + PKCE` の code flow を使うため、従来の `global-login` direct grant token と claim 構成が少し違っていた
+- 決定事項: `docker compose up -d --force-recreate ap-backend ap-backend-fpm nginx` 後に live の SSO bridge を HTTP で再現すると、`ap-frontend` token の payload は `sub=tenant-user-a`, `azp=ap-frontend`, `allowed-origins=[https://ap.example.com]` で、これを `https://ap-backend-fpm.example.com/api/me` と `/api/me/authorization` へ流した結果、どちらも `current_user = Alice A` を返した。`/api/me/authorization` では `user.manage` を含む authorization まで取得できたため、backend 側では AP Frontend bridge token を live で受け入れられると扱う
+- 影響範囲: AP Frontend の SSO bridge live 検証手順、`KEYCLOAK_ACCEPTED_CLIENT_IDS` の既定値、今後 `/api/users*` を bridge token で叩く前提、backend と frontend README の整合
+- 次の推奨アクション: 次は実ブラウザで AP Frontend の users 画面から `SSO Login` を押し、bridge token で `Current User = Alice A` と users 一覧 / 詳細の query 復元が UI 上でも自然に見えるかを通し確認する
+
 ### frontend の CurrentUser 取得口は `GET /api/me` を基準にする
 
 - 背景: frontend 側で auth 入口を 1 箇所に寄せる作業を進め、app shell から mode 切り替えと Bearer token 設定を扱えるようにした。これにより users 一覧 / 詳細がどちらも同じ token で live API を叩ける状態になり、CurrentUser の解決も backend 契約に沿って一本化できた
@@ -1756,3 +1770,24 @@ php artisan test
 - 決定事項: frontend では `GET /api/me` と `GET /api/me/authorization` を同じ Bearer token で取得し、dashboard sidebar のメニューは `authorization.permissions` と assignment の primary scope layer を基準に組み立てる。backend 側では dashboard メニュー制御に使う前提で `permissions` 集約の表現を維持する
 - 影響範囲: `GET /api/me/authorization` の継続運用、frontend dashboard shell、今後のメニュー追加時に必要な permission 粒度、`ap-server/backend/README.md`
 - 次の推奨アクション: 次は users 詳細の assignment 操作 UI を dashboard shell 上へ載せ、role / scope 候補 API で frontend が本当に必要とする filter 条件を確認する
+
+### 認可は「上位から下位への継承」を許容しつつ、実操作では対象 scope の明示を残す
+
+- 背景: 認可設計を見直す中で、server / service レイヤーに下位レイヤーを個別に表現しすぎると、1 AP あたりの service 数が少ない前提に対して過剰設計になりやすいことが分かった。一方で、上位レイヤーは下位レイヤーの管理や業務代行を担うため、`上位の権限は配下にも届く` という運用自体は維持したい
+- 決定事項: 直接付与された role / permission は、その所属 scope と descendant scope に対する scope-bound な操作に限って有効とする。つまり `上位は配下を管理できる` を基本方針にする一方、実際の作成・更新・削除・付与などの操作は、従来どおり対象 scope を明示して進める。`権限は継承してよいが、操作は必ず対象を指定して行う` を backend 認可方針の要約とする
+- 影響範囲: `AuthorizationService` の granted / accessible の役割分担、`required_permissions` middleware の使い方、users/object/playbook/policy/checklist など scope を持つ API の認可前提、frontend の drill-down UI、今後の認可仕様メモ全体
+- 次の推奨アクション: 次に実装を進めるときは、1) route 単位の `permissions` 判定だけで完結している API がないか確認する、2) scope を持つ操作は対象 scope を必ず受け取る契約に寄せる、3) `direct grant` と `descendant 由来の access` を API 表現やテストで混同していないかを点検する
+
+### `GET /api/me/authorization` は permission ごとの direct grant と descendant access を併記する
+
+- 背景: 認可方針を `上位は配下を管理できる` に寄せても、API 上で direct grant と descendant 由来の access を区別できないと、frontend の判断材料や後続テストが再び曖昧になりやすかった。既存の `assignments` と集約済み `permissions` は維持しつつ、その permission がどの scope に直接付与され、どこまで配下へ届くかを同じレスポンス内で確認できる形が必要だった
+- 決定事項: `GET /api/me/authorization` の `authorization` には既存の `assignments` と `permissions` を残したまま、permission slug ごとの `permission_scopes` を追加する。各 permission には `granted_scope_ids` と `accessible_scope_ids` を持たせ、前者は direct grant、後者は descendant を含む実効 access として扱う
+- 影響範囲: `AuthorizationService` の response 形式、`tests/Feature/Api/MeAuthorizationControllerTest.php`、今後 frontend が認可の根拠表示や drill-down 補助を足す時の参照契約、`ap-server/backend/README.md`
+- 次の推奨アクション: 次に frontend 側へ認可根拠表示を足すなら、まずは `permission_scopes` を debug / 補助表示に限定して使い、メニュー切り替えの一次判定は引き続き `authorization.permissions` で簡潔に保つ
+
+### AP backend の業務テーブルは `BaseModel + boolean soft delete` 前提で統一する
+
+- 背景: 今後 `objects` / `policies` などの CRUD を深掘る前に、既存テーブル都合として `created_by`, `created_at`, `updated_by`, `updated_at`, `is_deleted` を Laravel 標準より優先して扱う必要が出た。新規テーブルを Laravel 標準へ寄せる選択は取れないため、互換処理を model 層へ閉じ込めておかないと、各 service や controller ごとに監査列や論理削除の扱いが散らばりやすかった
+- 決定事項: AP backend の業務テーブルは `App\Models\BaseModel` を継承し、`HasAuditColumns` trait を使う `BaseModel::performInsert / performUpdate` で `created_by` / `updated_by` を共通設定する。論理削除は Laravel 標準 `SoftDeletes` を使わず、`HasBooleanSoftDeletes` で `is_deleted = false` の global scope と `delete()/restore()` を提供する。unique 制約は active row (`is_deleted = false`) だけに掛かる partial unique index 前提へ切り替え、削除後の再作成を阻害しない
+- 影響範囲: `app/Models/BaseModel.php`、`app/Models/Concerns/HasAuditColumns.php`、`app/Models/Concerns/HasBooleanSoftDeletes.php`、AP 系 model 全般、authorization/resource migration、delete 系 test、今後の CRUD 実装方針
+- 次の推奨アクション: 次に CRUD を進める時は、1) 新しい AP テーブルも同じ監査列と partial unique index を持たせる、2) delete 後の再作成と restore のどちらを UI 主導線にするか resource ごとに決める、3) `role_permissions` のような pivot 系更新で `syncWithPivotValues()` を使う方針を崩さない

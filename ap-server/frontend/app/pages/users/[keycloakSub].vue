@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PermissionRole, ScopeItem, UserAssignmentItem } from '~/composables/useApUserManagement'
 import { describeApApiError } from '~/utils/apApiError'
+import { buildAuthRecoveryCopy } from '~/utils/authRecoveryCopy'
+import { resolvePermissionAccessStatus } from '~/utils/permissionScopes'
 
 definePageMeta({
   layout: 'dashboard'
@@ -8,7 +10,7 @@ definePageMeta({
 
 const route = useRoute()
 const keycloakSub = computed(() => String(route.params.keycloakSub))
-const { mode, currentUser } = useApAuth()
+const { mode, currentUser, authorization, needsAuthRecovery, authRecoveryKind, globalLoginUrl } = useApAuth()
 const { getUser, listScopes, listRoles, addUserAssignment, deleteUserAssignment } = useApUserManagement()
 
 const serviceScopeId = computed(() => {
@@ -98,7 +100,7 @@ const scopeSearchKeyword = ref('')
 const roleSearchKeyword = ref('')
 const selectedPermissionRole = ref<PermissionRole | 'all'>('all')
 const selectedRoleSort = ref<'name' | 'slug' | 'permission_role'>('name')
-const feedback = ref<{ tone: 'success' | 'error'; message: string } | null>(null)
+const feedback = ref<{ tone: 'success' | 'error', message: string } | null>(null)
 const isSubmitting = ref(false)
 const deletingAssignmentId = ref<number | null>(null)
 const pendingRemovalAssignment = ref<UserAssignmentItem | null>(null)
@@ -131,6 +133,16 @@ watch(
 const selectedAssignmentScope = computed(
   () => assignmentScopeOptions.value.find(scope => scope.id === selectedAssignmentScopeId.value) ?? null
 )
+const userManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', selectedAssignmentScope.value?.id)
+)
+const selectedRoleUserManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', selectedAssignmentScope.value?.id)
+)
+const pendingRemovalUserManageAccess = computed(() =>
+  resolvePermissionAccessStatus(authorization.value, 'user.manage', pendingRemovalAssignment.value?.scope.id)
+)
+const authRecoveryCopy = computed(() => buildAuthRecoveryCopy(authRecoveryKind.value, 'users-detail'))
 
 const filteredAssignmentScopeOptions = computed(() => {
   const keyword = scopeSearchKeyword.value.trim().toLowerCase()
@@ -328,41 +340,97 @@ async function removeAssignment() {
       </div>
 
       <div class="flex items-center gap-3">
-        <UBadge v-if="currentUser" color="neutral" variant="soft">
+        <UBadge
+          v-if="currentUser"
+          color="neutral"
+          variant="soft"
+        >
           viewer: {{ currentUser.name }}
         </UBadge>
-        <UBadge :color="mode === 'live' ? 'success' : 'warning'" variant="soft">
+        <UBadge
+          :color="mode === 'live' ? 'success' : 'warning'"
+          variant="soft"
+        >
           {{ mode === 'live' ? 'LIVE API' : 'MOCK DATA' }}
         </UBadge>
-        <UButton to="/users" :query="backQuery" color="neutral" variant="soft" leading-icon="i-lucide-arrow-left">
+        <UButton
+          :to="{ path: '/users', query: backQuery }"
+          color="neutral"
+          variant="soft"
+          leading-icon="i-lucide-arrow-left"
+        >
           一覧へ戻る
         </UButton>
       </div>
     </div>
 
-    <div v-if="status === 'pending'" class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-muted dark:bg-stone-900/70">
+    <div
+      v-if="status === 'pending'"
+      class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-muted dark:bg-stone-900/70"
+    >
       users 詳細を読み込み中です。
     </div>
 
-    <div v-else-if="error || !user" class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-error dark:bg-stone-900/70">
+    <div
+      v-else-if="error || !user"
+      class="rounded-[2rem] border border-default bg-white/80 px-6 py-12 text-sm text-error dark:bg-stone-900/70"
+    >
       {{ detailErrorMessage ?? 'users 詳細の取得に失敗しました。' }}
     </div>
 
     <template v-else>
-      <UCard v-if="mode === 'live'" class="rounded-[2rem] border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20">
+      <UCard
+        v-if="mode === 'live'"
+        class="rounded-[2rem] border-amber-200 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-950/20"
+      >
         <template #header>
           <div class="flex items-center gap-2 text-sm font-semibold">
-            <UIcon name="i-lucide-badge-alert" class="text-amber-600" />
+            <UIcon
+              name="i-lucide-badge-alert"
+              class="text-amber-600"
+            />
             Live Check
           </div>
         </template>
 
         <p class="text-sm leading-6 text-toned">
-          live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。assignment 追加 / 削除で失敗した時は UI より先に token expiry を疑い、Auth Entry で fresh token を入れ直してから再試行してください。
+          live mode の推奨 API Base は `https://ap-backend-fpm.example.com/api` です。assignment 追加 / 削除や詳細再取得で `401/403` が続く時は、まず `SSO Login` で session を張り直し、live debug を続ける時だけ Auth Entry で token と API Base を確認してください。
         </p>
         <p class="mt-2 text-xs leading-5 text-muted">
-          正常系では viewer が `Alice A` で、assignment 追加は `201`、重複追加は `422`、削除は `204` になります。
+          `Failed to fetch` に見える時は session recovery ではなく、`ap-backend-fpm.example.com` の hosts と証明書許可を先に確認します。正常系では viewer が `Alice A` で、assignment 追加は `201`、重複追加は `422`、削除は `204` になります。
         </p>
+        <div
+          v-if="needsAuthRecovery && authRecoveryCopy.body"
+          class="mt-4 rounded-2xl border border-amber-300/70 bg-white/70 p-4 dark:bg-stone-950/30"
+        >
+          <p class="text-sm font-semibold text-highlighted">
+            Re-auth Flow
+          </p>
+          <p class="mt-2 text-sm text-toned">
+            {{ authRecoveryCopy.body }}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              :to="globalLoginUrl"
+              color="primary"
+              variant="soft"
+              trailing-icon="i-lucide-log-in"
+            >
+              SSO Login
+            </UButton>
+            <UButton
+              to="/#auth-entry"
+              color="neutral"
+              variant="soft"
+              trailing-icon="i-lucide-arrow-up-right"
+            >
+              Auth Entry Debug
+            </UButton>
+          </div>
+          <p class="mt-3 text-xs text-muted">
+            {{ authRecoveryCopy.logoutHint }}
+          </p>
+        </div>
       </UCard>
 
       <section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,380px)]">
@@ -377,7 +445,10 @@ async function removeAssignment() {
                   backend: `GET /api/users/{keycloak_sub}`
                 </p>
               </div>
-              <UIcon name="i-lucide-id-card" class="text-2xl text-primary" />
+              <UIcon
+                name="i-lucide-id-card"
+                class="text-2xl text-primary"
+              />
             </div>
           </template>
 
@@ -422,7 +493,10 @@ async function removeAssignment() {
                   assignment 集約結果
                 </p>
               </div>
-              <UIcon name="i-lucide-key-round" class="text-2xl text-primary" />
+              <UIcon
+                name="i-lucide-key-round"
+                class="text-2xl text-primary"
+              />
             </div>
           </template>
 
@@ -451,7 +525,10 @@ async function removeAssignment() {
                 single-assignment API を使って追加 / 削除します。
               </p>
             </div>
-            <UIcon name="i-lucide-shield-check" class="text-2xl text-primary" />
+            <UIcon
+              name="i-lucide-shield-check"
+              class="text-2xl text-primary"
+            />
           </div>
         </template>
 
@@ -477,13 +554,35 @@ async function removeAssignment() {
                 class="w-full rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-950"
                 :disabled="filteredAssignmentScopeOptions.length === 0 || servicesStatus === 'pending' || tenantsStatus === 'pending'"
               >
-                <option v-for="scope in filteredAssignmentScopeOptions" :key="scope.id" :value="scope.id">
+                <option
+                  v-for="scope in filteredAssignmentScopeOptions"
+                  :key="scope.id"
+                  :value="scope.id"
+                >
                   {{ scope.name }} ({{ scope.layer }})
                 </option>
               </select>
               <p class="text-xs text-muted">
                 {{ selectedAssignmentScope ? `${selectedAssignmentScope.code} / ${selectedAssignmentScope.layer}` : 'filter 条件に一致する scope がありません。' }}
               </p>
+              <div
+                v-if="selectedAssignmentScope"
+                class="flex flex-wrap items-center gap-2"
+              >
+                <UBadge
+                  :color="userManageAccess.tone"
+                  variant="soft"
+                >
+                  user.manage: {{ userManageAccess.label }}
+                </UBadge>
+                <p class="text-xs text-muted">
+                  {{ userManageAccess.kind === 'direct'
+                    ? 'この scope へ直接付与された管理権限です。'
+                    : userManageAccess.kind === 'descendant'
+                      ? '上位 scope の直付与から、この scope へ継承されている管理権限です。'
+                      : 'この scope に対する user.manage は確認できません。' }}
+                </p>
+              </div>
             </label>
 
             <label class="space-y-2">
@@ -493,7 +592,11 @@ async function removeAssignment() {
                   v-model="selectedPermissionRole"
                   class="rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                 >
-                  <option v-for="option in permissionRoleOptions" :key="option.value" :value="option.value">
+                  <option
+                    v-for="option in permissionRoleOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
                     {{ option.label }}
                   </option>
                 </select>
@@ -501,7 +604,11 @@ async function removeAssignment() {
                   v-model="selectedRoleSort"
                   class="rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary dark:bg-stone-950"
                 >
-                  <option v-for="option in roleSortOptions" :key="option.value" :value="option.value">
+                  <option
+                    v-for="option in roleSortOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
                     Sort: {{ option.label }}
                   </option>
                 </select>
@@ -517,7 +624,11 @@ async function removeAssignment() {
                 class="w-full rounded-2xl border border-default bg-white px-3 py-2 text-sm outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-950"
                 :disabled="!selectedAssignmentScope || filteredAvailableRoles.length === 0 || rolesStatus === 'pending'"
               >
-                <option v-for="role in filteredAvailableRoles" :key="role.id" :value="role.id">
+                <option
+                  v-for="role in filteredAvailableRoles"
+                  :key="role.id"
+                  :value="role.id"
+                >
                   {{ role.name }} ({{ role.slug }})
                 </option>
               </select>
@@ -547,21 +658,42 @@ async function removeAssignment() {
                   <p class="mt-2 text-sm font-semibold text-highlighted">
                     {{ selectedRole ? selectedRole.name : 'role を選ぶと summary を表示します。' }}
                   </p>
-                  <p v-if="selectedRole" class="text-xs text-toned">
+                  <p
+                    v-if="selectedRole"
+                    class="text-xs text-toned"
+                  >
                     {{ selectedRole.slug }} / {{ formatPermissionRoleLabel(selectedRole.permission_role) }}
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <UBadge v-if="selectedRole" color="neutral" variant="soft">
+                  <UBadge
+                    v-if="selectedRole"
+                    color="neutral"
+                    variant="soft"
+                  >
                     {{ formatPermissionRoleLabel(selectedRole.permission_role) }}
                   </UBadge>
-                  <UBadge v-if="selectedRole" color="neutral" variant="soft">
+                  <UBadge
+                    v-if="selectedRole"
+                    color="neutral"
+                    variant="soft"
+                  >
                     {{ selectedRole.permissions.length }} permissions
+                  </UBadge>
+                  <UBadge
+                    v-if="selectedRole && selectedAssignmentScope"
+                    :color="selectedRoleUserManageAccess.tone"
+                    variant="soft"
+                  >
+                    user.manage: {{ selectedRoleUserManageAccess.label }}
                   </UBadge>
                 </div>
               </div>
 
-              <div v-if="selectedRole" class="mt-3 flex flex-wrap gap-2">
+              <div
+                v-if="selectedRole"
+                class="mt-3 flex flex-wrap gap-2"
+              >
                 <UBadge
                   v-for="permission in selectedRole.permissions"
                   :key="permission.id"
@@ -571,14 +703,33 @@ async function removeAssignment() {
                   {{ permission.slug }}
                 </UBadge>
               </div>
+
+              <p
+                v-if="selectedRole && selectedAssignmentScope"
+                class="mt-3 text-xs text-muted"
+              >
+                この role を
+                <span class="font-semibold text-toned">{{ selectedAssignmentScope.name }}</span>
+                へ付与する操作は、
+                <span class="font-semibold text-toned">{{ selectedRoleUserManageAccess.label }}</span>
+                の `user.manage` を根拠にしています。
+              </p>
             </div>
           </section>
 
           <div class="flex flex-wrap gap-2 text-xs text-muted">
-            <UBadge v-if="selectedService" color="neutral" variant="soft">
+            <UBadge
+              v-if="selectedService"
+              color="neutral"
+              variant="soft"
+            >
               service: {{ selectedService.name }}
             </UBadge>
-            <UBadge v-if="tenantScopeId" color="primary" variant="soft">
+            <UBadge
+              v-if="tenantScopeId"
+              color="primary"
+              variant="soft"
+            >
               tenant drill-down active
             </UBadge>
             <span v-if="servicesStatus === 'pending' || tenantsStatus === 'pending'">
@@ -594,7 +745,10 @@ async function removeAssignment() {
             {{ feedback.message }}
           </div>
 
-          <div v-if="user.assignments.length === 0" class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted">
+          <div
+            v-if="user.assignments.length === 0"
+            class="rounded-2xl border border-dashed border-default px-4 py-8 text-sm text-muted"
+          >
             visible assignment はまだありません。上のフォームから追加できます。
           </div>
 
@@ -680,13 +834,33 @@ async function removeAssignment() {
               <p class="mt-1 text-toned">
                 {{ pendingRemovalAssignment.scope.layer }} / {{ pendingRemovalAssignment.scope.code }}
               </p>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <UBadge
+                  :color="pendingRemovalUserManageAccess.tone"
+                  variant="soft"
+                >
+                  user.manage: {{ pendingRemovalUserManageAccess.label }}
+                </UBadge>
+                <p class="text-xs text-muted">
+                  この削除操作は対象 scope に対する `user.manage` を根拠にしています。
+                </p>
+              </div>
             </div>
 
             <div class="flex justify-end gap-2">
-              <UButton color="neutral" variant="soft" :disabled="deletingAssignmentId !== null" @click="closeRemoveDialog">
+              <UButton
+                color="neutral"
+                variant="soft"
+                :disabled="deletingAssignmentId !== null"
+                @click="closeRemoveDialog"
+              >
                 Cancel
               </UButton>
-              <UButton color="error" :loading="deletingAssignmentId !== null" @click="removeAssignment">
+              <UButton
+                color="error"
+                :loading="deletingAssignmentId !== null"
+                @click="removeAssignment"
+              >
                 Remove
               </UButton>
             </div>

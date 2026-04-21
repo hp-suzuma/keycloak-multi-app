@@ -1,4 +1,5 @@
 import { describeApApiError } from '~/utils/apApiError'
+import { useApSso } from '~/composables/useApSso'
 
 export interface ApCurrentUser {
   id: string | number
@@ -34,10 +35,16 @@ export interface ApAssignment {
   permissions: ApPermission[]
 }
 
+export interface ApPermissionScopeAccess {
+  granted_scope_ids: number[]
+  accessible_scope_ids: number[]
+}
+
 export interface ApAuthorization {
   keycloak_sub: string
   assignments: ApAssignment[]
   permissions: string[]
+  permission_scopes: Record<string, ApPermissionScopeAccess>
 }
 
 interface MeResponse {
@@ -51,7 +58,7 @@ interface MeAuthorizationResponse {
 
 function withAuthorizationHeaders(token: string) {
   return {
-    Authorization: `Bearer ${token}`,
+    'Authorization': `Bearer ${token}`,
     'X-Forwarded-Authorization': `Bearer ${token}`
   }
 }
@@ -64,6 +71,7 @@ function withAuthorizationQuery(token: string) {
 
 type AuthMode = 'mock' | 'live'
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error'
+type AuthRecoveryKind = 'none' | 'setup' | 'refresh' | 'retry'
 
 const MOCK_CURRENT_USER: ApCurrentUser = {
   id: 'mock-admin-1',
@@ -106,7 +114,33 @@ const MOCK_AUTHORIZATION: ApAuthorization = {
     'object.update',
     'object.delete',
     'object.execute'
-  ]
+  ],
+  permission_scopes: {
+    'user.manage': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.read': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.create': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.update': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.delete': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    },
+    'object.execute': {
+      granted_scope_ids: [1],
+      accessible_scope_ids: [1, 11, 12, 21, 22, 23]
+    }
+  }
 }
 
 const MODE_STORAGE_KEY = 'ap-user-management-mode'
@@ -114,6 +148,10 @@ const TOKEN_STORAGE_KEY = 'ap-api-bearer-token'
 
 export function useApAuth() {
   const config = useRuntimeConfig()
+  const {
+    globalLoginUrl: buildGlobalLoginUrl,
+    globalLogoutUrl: buildGlobalLogoutUrl
+  } = useApSso()
   const modeOverride = useState<AuthMode | null>('ap-auth-mode-override', () => null)
   const tokenOverride = useState<string>('ap-auth-token-override', () => '')
   const currentUser = useState<ApCurrentUser | null>('ap-auth-current-user', () => null)
@@ -132,9 +170,45 @@ export function useApAuth() {
 
   const apiBase = computed(() => config.public.apApiBase)
   const bearerToken = computed(() => tokenOverride.value || config.public.apApiBearerToken)
+  const globalLoginUrl = computed(() => buildGlobalLoginUrl())
+  const globalLogoutUrl = computed(() => buildGlobalLogoutUrl())
   const hasBearerToken = computed(() => bearerToken.value.length > 0)
   const isLiveReady = computed(() => mode.value === 'live' && apiBase.value.length > 0 && hasBearerToken.value)
   const effectivePermissions = computed(() => authorization.value?.permissions ?? [])
+  const liveSessionLooksExpired = computed(() =>
+    mode.value === 'live'
+    && hasBearerToken.value
+    && status.value === 'ready'
+    && !currentUser.value
+    && !authorization.value
+  )
+  const needsAuthRecovery = computed(() =>
+    mode.value === 'live'
+    && (
+      !hasBearerToken.value
+      || status.value === 'error'
+      || liveSessionLooksExpired.value
+    )
+  )
+  const authRecoveryKind = computed<AuthRecoveryKind>(() => {
+    if (mode.value !== 'live') {
+      return 'none'
+    }
+
+    if (!hasBearerToken.value) {
+      return 'setup'
+    }
+
+    if (liveSessionLooksExpired.value) {
+      return 'refresh'
+    }
+
+    if (status.value === 'error') {
+      return 'retry'
+    }
+
+    return 'none'
+  })
 
   function persistClientState() {
     if (!import.meta.client) {
@@ -177,6 +251,15 @@ export function useApAuth() {
 
   function setBearerToken(nextToken: string) {
     tokenOverride.value = nextToken.trim()
+    persistClientState()
+  }
+
+  function clearClientAuth() {
+    tokenOverride.value = ''
+    currentUser.value = null
+    authorization.value = null
+    status.value = 'idle'
+    errorMessage.value = null
     persistClientState()
   }
 
@@ -243,6 +326,8 @@ export function useApAuth() {
     mode,
     apiBase,
     bearerToken,
+    globalLoginUrl,
+    globalLogoutUrl,
     currentUser,
     authorization,
     effectivePermissions,
@@ -250,8 +335,12 @@ export function useApAuth() {
     errorMessage,
     hasBearerToken,
     isLiveReady,
+    liveSessionLooksExpired,
+    needsAuthRecovery,
+    authRecoveryKind,
     setMode,
     setBearerToken,
+    clearClientAuth,
     refreshCurrentUser
   }
 }

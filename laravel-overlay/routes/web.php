@@ -28,6 +28,7 @@ if ($role === 'global-bff') {
     Route::get('/login', [GlobalAuthController::class, 'login']);
     Route::get('/auth/callback', [GlobalAuthController::class, 'callback']);
     Route::get('/logout', [GlobalAuthController::class, 'logout']);
+    Route::get('/logout/callback', [GlobalAuthController::class, 'logoutCallback']);
 }
 
 if (in_array($role, ['bff-a', 'bff-b'], true)) {

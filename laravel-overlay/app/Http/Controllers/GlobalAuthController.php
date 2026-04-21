@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class GlobalAuthController extends Controller
 {
+    private const POST_LOGIN_REDIRECT_KEY = 'post_login_redirect';
+
     public function __construct(
         private readonly OidcService $oidc,
     ) {
@@ -22,6 +24,11 @@ class GlobalAuthController extends Controller
 
         $request->session()->put('oidc_state', $state);
         $request->session()->put('oidc_nonce', $nonce);
+        $request->session()->forget(self::POST_LOGIN_REDIRECT_KEY);
+
+        if ($returnTo = $this->validatedAllowedRedirect($request->query('return_to'))) {
+            $request->session()->put(self::POST_LOGIN_REDIRECT_KEY, $returnTo);
+        }
 
         return redirect()->away($this->oidc->authorizationUrl(
             clientId: config('services.keycloak.client_id'),
@@ -46,6 +53,10 @@ class GlobalAuthController extends Controller
         $sub = $claims['sub'] ?? abort(500, 'sub claim is missing.');
         $request->session()->put('oidc_id_token', $tokens['id_token'] ?? null);
 
+        if ($postLoginRedirect = $request->session()->pull(self::POST_LOGIN_REDIRECT_KEY)) {
+            return redirect()->away($postLoginRedirect);
+        }
+
         $response = Http::acceptJson()->get(
             rtrim(env('BACKEND_URL'), '/').'/internal/users/'.$sub.'/server'
         )->throw()->json();
@@ -58,14 +69,57 @@ class GlobalAuthController extends Controller
     public function logout(Request $request): RedirectResponse
     {
         $idTokenHint = $request->session()->get('oidc_id_token');
+        $postLogoutRedirect = $this->validatedAllowedRedirect($request->query('return_to'))
+            ?? rtrim(config('app.url'), '/').'/';
+        $logoutCallbackUrl = rtrim(config('app.url'), '/').'/logout/callback?'.http_build_query([
+            'return_to' => $postLogoutRedirect,
+        ]);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->away($this->oidc->logoutUrl(
-            postLogoutRedirectUri: rtrim(config('app.url'), '/').'/',
+            postLogoutRedirectUri: $logoutCallbackUrl,
             idTokenHint: $idTokenHint,
             clientId: config('services.keycloak.client_id'),
         ));
+    }
+
+    public function logoutCallback(Request $request): RedirectResponse
+    {
+        $returnTo = $this->validatedAllowedRedirect($request->query('return_to'))
+            ?? rtrim(config('app.url'), '/').'/';
+
+        return redirect()->away($returnTo);
+    }
+
+    private function validatedAllowedRedirect(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        if (! filter_var($value, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+
+        if (($parts['scheme'] ?? null) !== 'https') {
+            return null;
+        }
+
+        $allowedHosts = [
+            'global.example.com',
+            'a.example.com',
+            'b.example.com',
+            'ap.example.com',
+        ];
+
+        if (! in_array($parts['host'] ?? '', $allowedHosts, true)) {
+            return null;
+        }
+
+        return $value;
     }
 }

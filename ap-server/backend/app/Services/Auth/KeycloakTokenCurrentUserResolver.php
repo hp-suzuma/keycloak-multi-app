@@ -107,9 +107,9 @@ class KeycloakTokenCurrentUserResolver
     private function hasValidClaims(array $claims): bool
     {
         $issuer = config('services.keycloak.issuer');
-        $clientId = config('services.keycloak.client_id');
+        $acceptedClientIds = config('services.keycloak.accepted_client_ids');
 
-        if (! is_string($issuer) || $issuer === '' || ! is_string($clientId) || $clientId === '') {
+        if (! is_string($issuer) || $issuer === '' || ! is_array($acceptedClientIds) || $acceptedClientIds === []) {
             return false;
         }
 
@@ -120,7 +120,11 @@ class KeycloakTokenCurrentUserResolver
         $audience = Arr::wrap($claims['aud'] ?? []);
         $authorizedParty = $claims['azp'] ?? null;
 
-        if (! in_array($clientId, $audience, true) && $authorizedParty !== $clientId) {
+        $matchesAcceptedClient = collect($acceptedClientIds)
+            ->filter(static fn (mixed $clientId): bool => is_string($clientId) && $clientId !== '')
+            ->contains(static fn (string $clientId): bool => in_array($clientId, $audience, true) || $authorizedParty === $clientId);
+
+        if (! $matchesAcceptedClient) {
             return false;
         }
 

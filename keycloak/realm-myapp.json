@@ -64,6 +64,25 @@
       ],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "ap-frontend",
+      "name": "AP Frontend SPA",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://ap.example.com/*"
+      },
+      "redirectUris": [
+        "https://ap.example.com/auth/callback"
+      ],
+      "webOrigins": [
+        "https://ap.example.com"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false
     }
   ],
   "users": [

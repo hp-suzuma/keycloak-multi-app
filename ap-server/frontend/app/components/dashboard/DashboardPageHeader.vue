@@ -8,7 +8,12 @@ defineProps<{
 
 <template>
   <div class="space-y-4">
-    <UBadge v-if="badge" color="primary" variant="soft" class="rounded-full px-4 py-1 text-xs font-semibold tracking-[0.24em]">
+    <UBadge
+      v-if="badge"
+      color="primary"
+      variant="soft"
+      class="rounded-full px-4 py-1 text-xs font-semibold tracking-[0.24em]"
+    >
       {{ badge }}
     </UBadge>
 

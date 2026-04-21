@@ -25,13 +25,72 @@ Keycloak を使った認証環境は維持しますが、優先順位は `認証
 - `https://b.example.com` : Tenant BFF B
 - `https://keycloak.example.com` : Keycloak
 - `https://pgadmin.example.com` : pgAdmin
+- `https://ap.example.com` : AP Frontend
+- `https://ap-backend-fpm.example.com` : AP Backend API
 
 サービス構成は [docker-compose.yml](/home/wsat/projects/keycloak-multi-app/docker-compose.yml) を参照してください。
+
+## 開発環境の基本方針
+
+今後の実開発や派生プロジェクト開発を見据えて、このリポジトリでは `Ubuntu 直の開発基盤 + Docker のアプリ実行基盤` を基本方針にします。
+
+- Ubuntu 直に置くもの
+  `git`, `Node 22`, `corepack`, `pnpm`, `Playwright`, `rg` などの開発ツール
+- Docker に残すもの
+  `PHP`, `Composer`, `Laravel`, `PostgreSQL`, `Keycloak`, `nginx` などのプロジェクト実行系
+
+この分け方により、ブラウザ自動確認や派生プロジェクトの開発速度は保ちつつ、壊れやすいランタイム依存はコンテナ側へ閉じ込められます。
+
+### Ubuntu Server 側の推奨 Browser 実行環境
+
+Browser 実行環境は `Playwright + Chromium` を第一候補にし、Ubuntu Server へ直接入れます。
+
+- Node は `.nvmrc` の `22` 系を基準にする
+- package manager は `pnpm` を推奨する
+- Browser E2E は [e2e/README.md](/home/wsat/projects/keycloak-multi-app/e2e/README.md) を起点にする
+
+最小セットアップ例:
+
+```bash
+cd /home/wsat/projects/keycloak-multi-app
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm --dir e2e install
+pnpm --dir e2e run install:browsers
+pnpm --dir e2e run doctor
+pnpm --dir e2e run wait:stack
+pnpm --dir e2e run test:sso
+```
+
+Ubuntu Server に browser 実行環境を初回導入する時は、`pnpm --dir e2e run bootstrap:ubuntu` を入口にする。
+このスクリプトが `nvm -> Node 22 -> corepack/pnpm -> Playwright Chromium` までまとめて整える。
+`/etc/hosts` を触れないサーバは `PLAYWRIGHT_HOST_MAP` を使い、Ubuntu 直の shared library が足りない時は Playwright 公式コンテナで browser 実測を継続する。
+日常運用では `pnpm --dir e2e run test:sso:auto` を SSO browser 実測の標準入口として扱ってよい。
+root 権限が取れるタイミングでは `pnpm --dir e2e run install:ubuntu-libs` を実行し、最終的には Ubuntu 直の `pnpm --dir e2e run test:sso` が通る状態へ寄せる。
+この Ubuntu Server では apt source の `URIs` を `http://archive.ubuntu.com` / `http://security.ubuntu.com` から `https://...` に変更したあと、Ubuntu 直の `pnpm --dir e2e run test:sso` が pass した。
+今後は `pnpm --dir e2e run doctor` の中でも Ubuntu apt source の `http/https` を確認し、新しい server で同じ詰まり方を早めに検知する。
+fresh Ubuntu Server の通し確認は `pnpm --dir e2e run verify:ubuntu` を入口にして、`doctor -> wait:stack -> test:sso:auto` をまとめて流せるようにする。
+別 server 実機で最初に状況確認から始める時は `pnpm --dir e2e run triage:ubuntu` を入口にして、`report -> doctor -> verify/recover` をまとめて流す。
+apt source が `http` のままなら、repo 内の `pnpm --dir e2e run fix:ubuntu-apt-sources` で `https` に揃えてから先へ進む。
+さらに、apt source `http` の修正から通し確認までを一度で流す入口として `pnpm --dir e2e run recover:ubuntu` を用意する。
+別 server 実機がまだ無い段階では `pnpm --dir e2e run selfcheck:recover-ubuntu` で recovery 分岐自体を temp fixture 上で自己検証できる。
+別 server 実機で詰まった時は `pnpm --dir e2e run report:ubuntu` を流し、診断情報をまとめて採る。
+この browser 実行環境整備は、現時点では「この Ubuntu Server で `pnpm --dir e2e run test:sso:auto` と `test:sso` が通る」到達点で一区切りにする。別 server 実機向けの `triage / recover / report` は将来の運用確認用として残し、当面の本題作業は AP Frontend / Backend の実装へ戻って進めてよい。
+
+### `bff-b` の扱い
+
+`bff-b` は現時点では削除しません。
+
+- 既存の multi-app / route assignment 検証資産としてまだ参照価値がある
+- nginx / hosts / Keycloak の検証構成が `b.example.com` を含む前提で組まれている
+- まずは「常時必要な主役サービスではない」と整理する段階で十分
+
+つまり、日常の AP 開発では主役ではありませんが、今は `削除` より `保持したまま必要時だけ見る` 方針にします。
 
 実装上の役割はおおむね次の通りです。
 
 - `frontend/`
-  Nuxt 3 の最小入口画面。現在はログインボタン中心です。
+  Nuxt 4 の最小入口画面。現在はログインボタン中心です。
 - `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`
   Keycloak ログイン開始と、所属先 BFF への振り分けを担当します。
 - `laravel-overlay/app/Http/Controllers/TenantAuthController.php`

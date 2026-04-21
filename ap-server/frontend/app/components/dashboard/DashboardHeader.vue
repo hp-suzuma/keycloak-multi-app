@@ -12,8 +12,12 @@ const {
   authorization,
   status,
   mode,
+  globalLoginUrl,
+  globalLogoutUrl,
+  clearClientAuth,
   refreshCurrentUser
 } = useApAuth()
+const { storeLogoutReturnNext } = useApSso()
 
 const roleBadge = computed(() => dashboardRoleBadge(authorization.value))
 const headerTitle = computed(() => {
@@ -35,6 +39,21 @@ const menuItems = computed(() => [
     icon: 'i-lucide-users',
     to: '/users'
   },
+  ...(mode.value === 'live'
+    ? [{
+        label: 'SSO Login',
+        icon: 'i-lucide-log-in',
+        to: globalLoginUrl.value
+      }, {
+        label: 'SSO Logout',
+        icon: 'i-lucide-log-out',
+        async onSelect() {
+          storeLogoutReturnNext()
+          clearClientAuth()
+          await navigateTo(globalLogoutUrl.value, { external: true })
+        }
+      }]
+    : []),
   {
     type: 'separator' as const
   },
@@ -69,7 +88,10 @@ const menuItems = computed(() => [
 
         <div class="flex items-center gap-3">
           <div class="flex size-10 items-center justify-center rounded-2xl bg-cyan-600 text-white shadow-lg shadow-cyan-950/10">
-            <UIcon :name="roleBadge.icon" class="size-5" />
+            <UIcon
+              :name="roleBadge.icon"
+              class="size-5"
+            />
           </div>
 
           <div>
@@ -84,16 +106,34 @@ const menuItems = computed(() => [
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
-        <UBadge :color="mode === 'live' ? 'success' : 'warning'" variant="soft" class="hidden sm:inline-flex">
+        <UBadge
+          :color="mode === 'live' ? 'success' : 'warning'"
+          variant="soft"
+          class="hidden sm:inline-flex"
+        >
           {{ mode === 'live' ? 'LIVE' : 'MOCK' }}
         </UBadge>
-        <UBadge :color="status === 'ready' ? 'primary' : 'neutral'" variant="soft" class="hidden md:inline-flex">
+        <UBadge
+          :color="status === 'ready' ? 'primary' : 'neutral'"
+          variant="soft"
+          class="hidden md:inline-flex"
+        >
           {{ status }}
         </UBadge>
 
-        <UDropdownMenu :items="menuItems" :content="{ align: 'end', sideOffset: 10 }">
-          <UButton color="neutral" variant="ghost" class="gap-2 px-2">
-            <UIcon name="i-lucide-user-round" class="size-6 text-muted" />
+        <UDropdownMenu
+          :items="menuItems"
+          :content="{ align: 'end', sideOffset: 10 }"
+        >
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="gap-2 px-2"
+          >
+            <UIcon
+              name="i-lucide-user-round"
+              class="size-6 text-muted"
+            />
             <span class="hidden text-sm font-semibold text-highlighted sm:inline">
               {{ currentUser?.name || 'Guest' }}
             </span>
@@ -102,7 +142,10 @@ const menuItems = computed(() => [
           <template #content-top>
             <div class="flex items-center gap-3 border-b border-default/80 px-3 py-3">
               <div class="flex size-10 items-center justify-center rounded-2xl bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-100">
-                <UIcon name="i-lucide-user-round" class="size-5" />
+                <UIcon
+                  name="i-lucide-user-round"
+                  class="size-5"
+                />
               </div>
               <div>
                 <p class="text-sm font-semibold text-highlighted">

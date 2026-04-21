@@ -1,0 +1,33 @@
+{
+  "name": "keycloak-multi-app-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap:ubuntu": "bash ./scripts/bootstrap-ubuntu.sh",
+    "fix:ubuntu-apt-sources": "bash ./scripts/fix-ubuntu-apt-sources.sh",
+    "install:ubuntu-libs": "bash ./scripts/install-ubuntu-playwright-libs.sh",
+    "doctor": "node ./scripts/doctor.mjs",
+    "report:ubuntu": "bash ./scripts/report-ubuntu-e2e.sh",
+    "recover:ubuntu": "bash ./scripts/recover-ubuntu-e2e.sh",
+    "selfcheck:recover-ubuntu": "bash ./scripts/selfcheck-recover-ubuntu.sh",
+    "triage:ubuntu": "bash ./scripts/triage-ubuntu-e2e.sh",
+    "wait:stack": "node ./scripts/wait-for-stack.mjs",
+    "verify:ubuntu": "bash ./scripts/verify-ubuntu-e2e.sh",
+    "test": "playwright test",
+    "test:sso": "playwright test tests/ap-frontend-sso-recovery.spec.ts tests/ap-frontend-operations-sso-recovery.spec.ts",
+    "test:sso:users": "playwright test tests/ap-frontend-sso-recovery.spec.ts",
+    "test:sso:operations": "playwright test tests/ap-frontend-operations-sso-recovery.spec.ts",
+    "test:sso:auto": "bash ./scripts/run-sso-auto.sh",
+    "test:sso:container": "bash ./scripts/run-sso-container.sh",
+    "test:sso:debug": "PLAYWRIGHT_SSO_DEBUG=1 bash ./scripts/run-sso-container.sh",
+    "test:sso:triage": "bash ./scripts/run-sso-triage.sh",
+    "selfcheck:callback-triage": "bash ./scripts/selfcheck-callback-triage.sh",
+    "test:headed": "playwright test --headed",
+    "codegen": "playwright codegen https://ap.example.com",
+    "install:browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "@types/node": "^22.15.30"
+  }
+}

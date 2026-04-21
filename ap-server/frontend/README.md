@@ -240,3 +240,444 @@ curl -k https://keycloak.example.com/realms/myapp/protocol/openid-connect/token 
 - 決定事項: AP frontend では `app/layouts/dashboard.vue` を追加し、header / sidebar / footer を component 分割して共通 shell 化する。sidebar のメニューは `GET /api/me/authorization` で取れる `permissions` と assignment の layer に応じて切り替え、`/` をログイン後ホームとして使う
 - 影響範囲: `ap-server/frontend/app/layouts/dashboard.vue`、`app/components/dashboard/*`、`app/utils/dashboard.ts`、`app/pages/index.vue`、暫定 resource pages、今後のメニュー追加判断
 - 次の推奨アクション: 次は users 詳細に assignment 追加 / 削除 UI を載せつつ、dashboard shell の page header / toolbar パターンで role / scope 候補フォームをどう収めるかを決める
+
+### Auth Entry では `permission_scopes` を debug 表示し、メニュー判定は `permissions` のまま保つ
+
+- 背景: backend の認可見直しで `GET /api/me/authorization` に permission ごとの `granted_scope_ids` / `accessible_scope_ids` が追加され、frontend でも direct grant と descendant access の違いを確認できるようになった。ただし、これをすぐ menu 表示ロジックへ混ぜると、既存の dashboard shell が必要以上に複雑になりやすかった
+- 決定事項: `AppAuthPanel` に `permission_scopes` の補助表示を追加し、permission ごとの direct grant と accessible scope を debug 用に確認できるようにする。一方で sidebar や home のメニュー切り替えは引き続き `authorization.permissions` を一次判定に使い、`permission_scopes` は認可根拠の可視化に限定する
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`GET /api/me/authorization` の frontend 利用方針、dashboard shell の今後の認可表示拡張
+- 次の推奨アクション: 次に frontend の認可表示を広げるなら、users 一覧や詳細で現在選択中 scope に対して `user.manage` が direct grant なのか descendant access なのかを表示するかを検討し、必要になった時だけ `permission_scopes` の利用箇所を増やす
+
+### users 一覧と詳細では選択中 scope に対する `user.manage` の根拠だけを補助表示する
+
+- 背景: `permission_scopes` を Auth Entry だけで見せても、実際の users 操作と結び付けて見ないと「この tenant を触れるのが直付与なのか、上位からの継承なのか」が分かりづらかった。一方で、一覧や詳細で全 permission を並べ始めると画面が重くなるため、まずは users 導線で重要な `user.manage` だけに絞るのが妥当だった
+- 決定事項: users 一覧では drill-down で選択中の `activeScope`、users 詳細では assignment フォームの `selectedAssignmentScope` に対して、`user.manage` が `direct grant` / `descendant access` / `権限なし` のどれかを補助表示する。表示判定は `permission_scopes` を使うが、一覧取得やメニュー切り替えの本判定自体は変えない
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`ap-server/frontend/app/utils/permissionScopes.ts`、mock/live 両モードでの users 認可表示、今後の scope ごとの権限根拠説明
+- 次の推奨アクション: 次に進めるなら、users 一覧から詳細へ遷移した後も同じ scope 文脈で認可表示が自然に読めるかを live mode で確認し、必要なら assignment 削除確認 modal や role summary にも同じ access 表示を広げる
+
+### users 詳細の role summary と削除確認 modal でも同じ `user.manage` access 表示を使う
+
+- 背景: 選択中 scope に対する `user.manage` の根拠を一覧や assignment フォームで見せられるようになっても、実際に操作直前で見る `Role Summary` と `Remove Assignment` modal に同じ情報が無いと、画面の場所によって説明が揺れて見えやすかった
+
+### objects / policies の browser 回帰は users 系 spec と分けて育てる
+
+- 背景: 次の browser 回帰対象として `objects` / `policies` を棚卸ししたところ、現状の frontend はどちらも dashboard shell 上の placeholder page で、確認したい主眼は users 一覧・詳細の query recovery ではなく `object.read` による導線表示と page 単位の SSO 復帰だった。既存の users spec にこの責務を足すと、assignment や detail context の失敗と Operations 導線の失敗が混ざって読みづらくなる
+- 決定事項: `objects` / `policies` の browser 回帰は users 系 spec に追加せず、E2E 側で Operations 専用 spec を新設して育てる前提にする。frontend 側の次実装でも、users は scope query / detail recovery、Operations は page 導線 / logout-relogin recovery という分担で考える
+- 影響範囲: `ap-server/frontend/app/pages/objects/index.vue`、`app/pages/policies/index.vue`、dashboard の Operations 導線、`e2e/tests/ap-frontend-operations-sso-recovery.spec.ts` を起点にした今後の browser 回帰設計
+- 次の推奨アクション: 次は `objects` / `policies` のどちらから先に一覧 UI へ着手するかを決め、placeholder card を置き換える最小契約として scope filter・検索・sort のどこまでを最初の実装範囲に含めるかを README に残してから進める
+
+### objects 一覧を Operations 実装の先行対象にし、最初は一覧取得だけに絞る
+
+- 背景: `objects` と `policies` はどちらも `object.read` 前提の resource だが、backend README では `GET /api/objects` の契約が先頭にあり、frontend でも Operations 系の最初の実一覧パターンを 1 つ決めておくと `policies` 以降へ横展開しやすい状態だった。いきなり detail / update まで入れるより、scope filter と code/name 検索を含む一覧取得を先に固めた方が差分も小さく保てる
+- 決定事項: Operations の最初の実装対象は `objects` にする。初回契約は `service_scope_id` / `tenant_scope_id` から `scope_id = tenant ?? service` を組み立て、`code`・`name`・`sort` を query に載せて `GET /api/objects` を叩く最小一覧に限定する。pagination UI や detail/edit 導線はまだ追加せず、`policies` は同じ一覧パターンへ寄せる次段の対象として残す
+- 影響範囲: `ap-server/frontend/app/pages/objects/index.vue`、`app/composables/useApUserManagement.ts` の objects 一覧取得、Operations spec の objects assertion、今後の `policies` 一覧実装方針
+- 次の推奨アクション: 次は `policies` にも同じ一覧骨格を適用するか、先に `objects` の detail / update 導線を足すかを決める。横展開を優先するなら `policies` 一覧、CRUD 深掘りを優先するなら `objects/{id}` 導線の順で進める
+- 決定事項: users 詳細では `Role Summary` に「この scope へ付与する操作の根拠」を、assignment 削除確認 modal に「この削除操作の根拠」を、それぞれ `direct grant` / `descendant access` / `権限なし` の same helper で表示する。users 詳細内の `user.manage` 根拠表示は同じ `permissionScopes` helper に統一する
+- 影響範囲: `ap-server/frontend/app/pages/users/[keycloakSub].vue`、assignment 追加/削除前の認可根拠表示、live mode 手動確認時に見るべき UI 要素、今後の modal / summary パターン再利用
+- 次の推奨アクション: 次は live mode で users 一覧から詳細へ入り、scope 切り替え時に一覧バッジ、assignment フォーム、role summary、削除確認 modal の `user.manage` 表示が同じ文脈で読めるかを通しで確認する
+
+### live token で確認した scope 文脈では `Service Alpha` が direct、`Tenant A` が descendant と読める
+
+- 背景: users 一覧、assignment フォーム、role summary、削除確認 modal に `user.manage` の根拠表示を増やしたあと、実データでも同じ文脈で読めるかを確認する必要があった。この環境では browser UI の自動操作手段が無かったため、同じ `alice` token と endpoint を CLI で辿って live API の事実関係を先に固めた
+- 決定事項: `alice` の fresh token で `GET /api/me/authorization` を確認すると、`user.manage` は `granted_scope_ids = [1, 2]`、`accessible_scope_ids = [1, 2, 3]` だった。つまり `AP Root` と `Service Alpha` は direct grant、`Tenant A` は descendant access と読める。さらに `GET /api/users?scope_id=2` では `tenant-user-a`、`GET /api/users?scope_id=3` では `tenant-user-b`、`GET /api/users/tenant-user-b` では `Tenant A / tenant_viewer` が返り、`GET /api/roles?scope_layer=tenant` でも tenant role 候補が揃っていたため、users 詳細で表示している access 文脈は live API と整合していると扱う
+- 影響範囲: `ap-server/frontend` の users 一覧 / 詳細の認可根拠表示、live mode 手動確認時の期待値、`Auth Entry` の `permission_scopes` debug 表示との整合、今後の token expiry 確認作業
+- 次の推奨アクション: 次に進めるなら、期限切れ token をあえて使って `GET /api/me/authorization` と `GET /api/users*` を失敗させ、Auth Entry / users 一覧 / users 詳細で `403` の案内文が期待どおりに読めるかを確認する
+
+### 期限切れ token の live 実挙動では Auth Entry は `null`、users 系は `403` になる
+
+- 背景: token expiry 時の案内文を UI で確認しようとしたところ、実際の backend 応答は endpoint によって異なっていた。README では「Auth Entry / users 画面で `403` を見る」前提になっていたが、live API を失効済み token で叩くとそのままではズレがあった
+- 決定事項: 失効済み token で `GET /api/me` と `GET /api/me/authorization` を叩くと、どちらも `200` で `current_user: null` / `authorization: null` を返す。一方、`GET /api/users*` は `403 Forbidden` を返す。これに合わせて `AppAuthPanel` では「Auth Entry 上は `403` ではなく `null` として見えることがある」案内を追加し、users 一覧 / 詳細の `403` 文言とは切り分けて扱う
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、期限切れ token 時の live mode UX、Auth Entry と users 画面のエラー理解、今後の再認証導線検討
+- 次の推奨アクション: 次に進めるなら、実運用向けの auth UX を詰める保留議題へ戻り、`401/403/null current_user` を silent login / token refresh / SSO へ戻す導線のどれで吸収するかを決める
+
+### 暫定 auth UX では Auth Entry を再認証ハブに統一する
+
+- 背景: live mode の auth 失敗は `401` / `403` / `current_user: null` に分かれて見えるため、users 一覧や詳細で個別に説明すると「どこへ戻れば復旧できるか」が画面ごとにぶれやすかった。一方、この段階では silent login や refresh token、SSO redirect の本実装はまだ無く、既存 UI で確実に吸収できる導線を先に揃える必要があった
+- 決定事項: 当面は `AppAuthPanel` を再認証ハブとして扱い、live mode で Bearer token 未設定・`current_user: null`・API error のいずれでも「まず Auth Entry で fresh token を更新してから users 画面へ戻る」導線を共通表示する。silent login / token refresh / SSO redirect の選定は保留し、users 一覧 / 詳細には `/#auth-entry` へ戻す CTA を置く
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、live mode の再認証オペレーション、今後の本実装 auth 導線差し替え
+- 次の推奨アクション: 次は Keycloak / Nuxt 間で silent login、refresh token、SSO redirect のどれを正式採用するかを決め、暫定の Auth Entry 導線を本番向け session recovery に置き換える
+
+### ap-frontend 検証コンテナは Node 22 系を基準にする
+
+- 背景: `ap-frontend` コンテナ内で `npm run lint` を回したところ、ESLint 10 系が依存経由で使う `Object.groupBy` を Node 20.20.2 が持たず、frontend の差分確認前に `TypeError: Object.groupBy is not a function` で停止した。検証を継続的に回すには、repo 側で container runtime を先に揃える必要があった
+- 決定事項: `docker/ap-frontend/Dockerfile` の base image を `node:22-alpine` に上げ、`ap-server/frontend` の lint / typecheck は Node 22 系の `ap-frontend` コンテナを基準に実行する
+- 影響範囲: `docker/ap-frontend/Dockerfile`、`docker compose up -d --build ap-frontend` 後の frontend 検証手順、今後の ESLint / Nuxt 更新時の runtime 前提
+- 次の推奨アクション: 次は `ap-frontend` を rebuild して `npm run lint` と `npm run typecheck` を回し、Node 22 前提で frontend 検証が安定して通ることを確認する
+
+### 実運用向け session recovery は `global.example.com/login` へ戻す SSO redirect を正式採用する
+
+- 背景: 保留していた比較候補を見直すと、現行の AP Frontend は refresh token を保持せず、AP 専用の silent login callback もまだ持っていない。この状態で silent login や token refresh を frontend 単体へ先行実装すると、BFF / Keycloak との責務分離が崩れやすかった
+- 決定事項: 実運用向け session recovery は `https://global.example.com/login` へ戻す SSO redirect を正式採用する。`Auth Entry` の Bearer token 入力は live debug 専用と位置づけ、users 一覧 / 詳細 / dashboard header の recovery CTA は SSO Login を主導線、`/#auth-entry` は debug 用補助導線として扱う
+- 影響範囲: `ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`ap-server/frontend/app/utils/apApiError.ts`、`ap-server/frontend/nuxt.config.ts`、今後の AP 向け BFF 追加判断
+- 次の推奨アクション: 次は AP Frontend 自身が SSO 完了後に自然復帰できるよう、`ap.example.com` 側の callback / session bridge をどこへ置くかを決め、`global.example.com/login` から AP へ戻る正式経路を追加する
+
+### frontend の lint warning は早めに auto-fix で解消していく
+
+- 背景: Node 22 化後に `ap-frontend` コンテナで lint を正常実行できるようになった結果、既存の `vue/max-attributes-per-line` と `vue/attributes-order` 由来の warning が大量に見えるようになった。この状態を残すと、今後の実装差分で本当に見たい lint signal が warning 群に埋もれやすい
+- 決定事項: `ap-server/frontend` では lint warning を将来まとめて片づけるのではなく、見つかった段階で `eslint --fix` を使って早めに解消する。今回も `ap-frontend` コンテナ内で auto-fix を適用し、template 属性改行や順序の整形を repo の lint ルールへ合わせた
+- 影響範囲: `ap-server/frontend/app/components/dashboard/*`、`app/pages/index.vue`、`app/pages/users/*` を含む template formatting、`docker/ap-frontend/Dockerfile` を使った lint 運用、今後の frontend 差分レビューのノイズ量
+- 次の推奨アクション: 次は AP Frontend の callback / session bridge を進める実装でも、作業の最後に `docker compose exec ap-frontend npm run lint` と `npm run typecheck` を回し、warning を再び溜めない運用を続ける
+
+### AP Frontend の SSO 復帰は `global login -> /auth/bridge -> /auth/callback` でつなぐ
+
+- 背景: 実運用向け session recovery を `global.example.com/login` に寄せても、そのままでは AP Frontend 側に SSO 完了後の token 受け口が無く、ログイン後に `ap.example.com` へ自然復帰できなかった。tenant BFF と同じ server-side session をそのまま持ち込むより、AP Frontend 専用の Bearer token を browser 側で受け取り直す薄い bridge を置く方が責務分離に合っていた
+- 決定事項: Global BFF の `/login` は `return_to` を受け付け、AP Frontend の `SSO Login` は `https://global.example.com/login?return_to=https://ap.example.com/auth/bridge?...` を使う。`/auth/bridge` では Keycloak SSO session を使って `prompt=none + PKCE` の認可コードフローを開始し、`/auth/callback` で `ap-frontend` public client の access token を受け取って `useApAuth()` の Bearer token と live mode へ反映する
+- 影響範囲: `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`keycloak/realm-myapp.json`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/pages/auth/bridge.vue`、`ap-server/frontend/app/pages/auth/callback.vue`、既存の `SSO Login` CTA、Keycloak realm 再読込手順、今後の AP 向け logout / callback 拡張
+- 次の推奨アクション: 次は `docker compose up -d --force-recreate keycloak bff-global ap-frontend nginx` で realm と Global BFF を反映し、`https://ap.example.com` の `SSO Login` から users 一覧 / 詳細へ元の path・query を保ったまま自然復帰できるかを live で通し確認する
+
+### live の SSO bridge では users path/query は保たれ、backend 側は `ap-frontend` token audience を許可する必要があった
+
+- 背景: 次の推奨アクションに従って live で `global.example.com/login?return_to=...` を辿ったところ、最初は Global BFF の image を rebuild していなかったため `return_to` が反映されず `a.example.com/auth/silent-login` へ戻っていた。さらに rebuild 後は `ap.example.com/auth/bridge?next=...` と `ap.example.com/auth/callback?...` までは進めたが、bridge 後の `ap-frontend` token を `GET /api/me*` へ流すと `current_user: null` になり、backend 側の audience 前提も揃える必要が分かった
+- 決定事項: live 実測では `SSO Login` から `https://ap.example.com/auth/bridge?next=%2Fusers%3Fservice_scope_id%3D2%26tenant_scope_id%3D3%26keyword%3Dalice%26sort%3D-email` へ戻り、bridge HTML 上でも同じ users query を確認できた。加えて backend が `global-login,ap-frontend` の両 client audience を受け入れるようにした後は、bridge で取った token でも `GET /api/me` が `Alice A`、`GET /api/me/authorization` が `user.manage` を含む authorization を返し、AP Frontend 自然復帰の前提が live で通った
+- 影響範囲: `ap-server/frontend` の SSO recovery 実測手順、`laravel-overlay/app/Http/Controllers/GlobalAuthController.php` の rebuild 必要性、`ap-server/backend` の accepted client ids 前提、今後の users 一覧 / 詳細の live 手動確認
+- 次の推奨アクション: 次は実ブラウザで `https://ap.example.com/users?service_scope_id=2&tenant_scope_id=3&keyword=alice&sort=-email` から `SSO Login` を押し、callback 後に同じ users 画面と query のまま復帰して `Current User = Alice A` と `user.manage` が見えることを UI で確認する
+
+### browser 実測の入口は `e2e/` の Playwright doctor と SSO spec に寄せる
+
+- 背景: 次の確認作業は「Ubuntu Server へ直接入れた browser 実行環境」で AP Frontend の SSO 自然復帰を通す段階になった。ここで毎回手動で `Node` 版数、`*.example.com` の名前解決、stack 起動待ちを確認すると、Playwright 本体に入る前の前提漏れで止まりやすい
+- 決定事項: browser 実測の入口はルート `e2e/README.md` とし、まず `pnpm --dir e2e run doctor` で Node 22 / hosts / URL 疎通をまとめて確認し、その後 `pnpm --dir e2e run wait:stack` と `pnpm --dir e2e run test:sso` で AP Frontend の SSO recovery UI を流す
+- 影響範囲: Ubuntu Server 直の browser 実行手順、`ap-server/frontend` の SSO recovery 実ブラウザ確認、次チャット以降の UI 実測開始地点
+- 次の推奨アクション: 次は Ubuntu Server 上で `corepack enable` と `pnpm --dir e2e install` / `install:browsers` を済ませ、`doctor -> wait:stack -> test:sso` の順に実行して `Current User = Alice A` と `user.manage` の表示まで実ブラウザで確認する
+
+### Ubuntu Server 初回導入は `bootstrap:ubuntu` を入口にする
+
+- 背景: browser 実測の前提を毎回手で入れるより、Ubuntu Server 初回導入をスクリプト化した方が派生プロジェクトでも流用しやすく、Node 版数や `pnpm` 有効化の揺れも減らせる
+- 決定事項: Ubuntu Server 初回導入の入口は `pnpm --dir e2e run bootstrap:ubuntu` ではなく、Node 未導入でも動けるよう `bash e2e/scripts/bootstrap-ubuntu.sh` でも直接叩ける `e2e/scripts/bootstrap-ubuntu.sh` を正とする。Node 導入後は `doctor -> wait:stack -> test:sso` の順で AP Frontend の SSO 実測へ進む
+- 影響範囲: Ubuntu Server 直の browser 環境構築、`e2e/.env` の初期化、今後の Playwright 実測開始手順
+- 次の推奨アクション: 次は Ubuntu Server 上で `bash e2e/scripts/bootstrap-ubuntu.sh` を実行し、必要なら `e2e/.env` の認証情報を調整した上で `pnpm --dir e2e run doctor -> wait:stack -> test:sso` を流す
+
+### 実ブラウザの SSO recovery は `PLAYWRIGHT_HOST_MAP` と Playwright 公式コンテナでも通せる
+
+- 背景: Ubuntu Server 実機で `doctor` と `wait:stack` は通ったが、`/etc/hosts` を直接更新できない環境と、`libatk-1.0.so.0` 不足で Ubuntu 直の Chromium が起動できない環境差分が見えた。それでも AP Frontend の SSO recovery UI 実測は止めずに進めたかった
+- 決定事項: `e2e` では `PLAYWRIGHT_HOST_MAP` を既定で持ち、`ap.example.com`, `global.example.com`, `keycloak.example.com`, `ap-backend-fpm.example.com` を `127.0.0.1` へ解決できるようにした。Ubuntu 直の shared library が足りない時は `docker run --rm --network host --user 1000:1000 -e CI=true -v /home/wsat/projects/keycloak-multi-app:/work -w /work/e2e mcr.microsoft.com/playwright:v1.59.1-noble ...` で `test:sso` を流してよい
+- 影響範囲: Ubuntu Server 直の browser 実測、`e2e/playwright.config.ts` の host resolver、`e2e/scripts/doctor.mjs` と `wait-for-stack.mjs` の疎通確認、今後の AP Frontend SSO 回帰テスト
+- 次の推奨アクション: 次は Ubuntu Server 側で必要なら OS shared library を root 権限で整え、Ubuntu 直の `pnpm --dir e2e run test:sso` でも同じシナリオが通るかを確認する。暫定運用では Playwright 公式コンテナ実行を browser 実測の既定 fallback として扱ってよい
+
+### browser 実測の標準入口は `test:sso:auto` に寄せる
+
+- 背景: Ubuntu Server ごとに Chromium shared library の揺れがあり、毎回「まずローカルを試すか、最初から container へ行くか」を人が判断すると運用がぶれやすい
+- 決定事項: `e2e/scripts/run-sso-auto.sh` を追加し、標準入口は `pnpm --dir e2e run test:sso:auto` に寄せる。これはまず Ubuntu 直の `test:sso` を試し、`browserType.launch` や `libatk-1.0.so.0` 由来の library エラー時だけ `test:sso:container` へ fallback する。アプリ側 assertion 失敗では自動 fallback せず、そのままテスト失敗として扱う
+- 影響範囲: Ubuntu Server 直の Playwright 実行運用、Playwright 公式コンテナの呼び出し手順、今後の AP Frontend SSO 回帰の入口コマンド
+- 次の推奨アクション: 次は Ubuntu Server 上で `pnpm --dir e2e run test:sso:auto` を定常運用コマンドにしつつ、別途 root 権限が取れるタイミングで Chromium 依存 library を導入し、auto fallback せずローカルだけで通る状態へ寄せる
+
+### Ubuntu 直の Chromium 依存 library は installer script でまとめて入れる
+
+- 背景: 実機の `ldd` では `libatk-1.0.so.0`, `libatk-bridge-2.0.so.0`, `libcups.so.2`, `libasound.so.2`, `libgbm.so.1`, `libcairo.so.2`, `libpango-1.0.so.0`, `libXcomposite.so.1`, `libXdamage.so.1`, `libXfixes.so.3`, `libXrandr.so.2`, `libatspi.so.0` が不足していたが、作業時点では `sudo` パスワードが無く即時導入までは進められなかった
+- 決定事項: root 権限が取れるタイミングに備えて `e2e/scripts/install-ubuntu-playwright-libs.sh` と `pnpm --dir e2e run install:ubuntu-libs` を追加し、この Ubuntu 24 系サーバで必要だった package 群を 1 回で入れられるようにした
+- 影響範囲: Ubuntu 直の Playwright/Chromium 実行、browser 実測の root 作業手順、今後の server セットアップ再現性
+- 次の推奨アクション: 次は root 権限が使えるタイミングで `pnpm --dir e2e run install:ubuntu-libs` を実行し、その直後に `pnpm --dir e2e run test:sso` を再実行して container fallback なしで pass するか確認する
+
+### この Ubuntu Server では apt source を `https` に替えたあとローカル `test:sso` まで通った
+
+- 背景: `install:ubuntu-libs` 実行中に `archive.ubuntu.com` / `security.ubuntu.com` への `http` 接続が繰り返し timeout し、package download が進まなかった
+- 決定事項: Ubuntu 側の `/etc/apt/sources.list.d/ubuntu.sources` の `URIs` を `http://archive.ubuntu.com/ubuntu/` / `http://security.ubuntu.com/ubuntu/` から `https://...` へ変更したうえで library 導入を進めた。結果として、この実機では Ubuntu 直の `pnpm --dir e2e run test:sso` が pass し、container fallback なしでも AP Frontend の SSO recovery を確認できた
+- 影響範囲: Ubuntu Server の apt 運用、`install:ubuntu-libs` 実行前の network troubleshooting、今後の browser 実測の既定手順
+- 次の推奨アクション: 次は `test:sso:auto` を日常入口として維持しつつ、別の Ubuntu Server を立てる時も apt source を最初から `https` に寄せるか確認する
+
+### `doctor` でも apt source の `http/https` を先に見る
+
+- 背景: apt source の `http` 問題は `install:ubuntu-libs` 実行まで見えず、browser 実測より前の段で時間を使いやすかった
+- 決定事項: `e2e/scripts/doctor.mjs` でも `/etc/apt/sources.list.d/ubuntu.sources` と `/etc/apt/sources.list` を見て、`archive.ubuntu.com` / `security.ubuntu.com` が `http` のままなら warning 相当ではなく失敗として返すようにした
+- 影響範囲: 新しい Ubuntu Server での初回 browser セットアップ、`doctor -> install:ubuntu-libs` の順序、apt network troubleshooting の開始地点
+- 次の推奨アクション: 次は別の Ubuntu Server でも `pnpm --dir e2e run doctor` を最初に流し、apt source が `http` のままなら `https` へ直してから library 導入に進む
+
+### fresh Ubuntu Server の通し確認は `verify:ubuntu` に寄せる
+
+- 背景: 新しい server では `doctor`, `wait:stack`, `test:sso:auto` を順に打つ必要があり、確認順序が人によってぶれやすかった
+- 決定事項: `e2e/scripts/verify-ubuntu-e2e.sh` と `pnpm --dir e2e run verify:ubuntu` を追加し、fresh server の通し確認はこのコマンドを入口にする。中では `doctor -> wait:stack -> test:sso:auto` を順に流す
+- 影響範囲: 新しい Ubuntu Server での browser 実測開始手順、初回セットアップ後の smoke test、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server で `pnpm --dir e2e run verify:ubuntu` を実行し、`doctor` の apt source 判定から `test:sso:auto` まで同じ導線で通るかを確認する
+
+### apt source の `http` 修正も repo 内 script に寄せる
+
+- 背景: `doctor` が apt source の `http` を検知できるようになっても、修正手順が会話頼みだと別 server で手が止まりやすい
+- 決定事項: `e2e/scripts/fix-ubuntu-apt-sources.sh` と `pnpm --dir e2e run fix:ubuntu-apt-sources` を追加し、`/etc/apt/sources.list.d/ubuntu.sources` の `archive/security` URI を backup つきで `https` へ置き換えられるようにした
+- 影響範囲: 新しい Ubuntu Server の apt recovery 手順、`doctor` 後の修正導線、browser 実測の再現性
+- 次の推奨アクション: 次は別の Ubuntu Server で `doctor` が apt source `http` を検知した時に `pnpm --dir e2e run fix:ubuntu-apt-sources` を実行し、その後 `verify:ubuntu` が通るかを確認する
+
+### apt source `http` の検知から修正までは `recover:ubuntu` に寄せる
+
+- 背景: `doctor` が apt source `http` を検知しても、その後に `fix -> doctor -> verify` を人手でつなぐ必要があり、fresh server で少し煩雑だった
+- 決定事項: `e2e/scripts/recover-ubuntu-e2e.sh` と `pnpm --dir e2e run recover:ubuntu` を追加し、`doctor` が `apt:ubuntu-sources` で落ちた時だけ `fix:ubuntu-apt-sources -> doctor -> verify:ubuntu` を自動でつなぐようにした。他の failure では自動 recovery せず、そのまま停止する
+- 影響範囲: 新しい Ubuntu Server の初回 recovery 導線、`doctor` failure 後の運用、browser 実測の再現性
+- 次の推奨アクション: 次は別の Ubuntu Server で apt source が `http` の状態を作り、`pnpm --dir e2e run recover:ubuntu` が `fix -> verify` まで同じ導線で通るかを確認する
+
+### recovery 分岐の自己検証は temp fixture で回せるようにする
+
+- 背景: 実際の別 Ubuntu Server が無い状態だと、`recover:ubuntu` の `apt:ubuntu-sources` 分岐そのものを手元で検証しづらかった
+- 決定事項: `doctor` には `E2E_UBUNTU_SOURCE_FILES`、`fix-ubuntu-apt-sources` には `E2E_UBUNTU_SOURCE_TARGET` の override 口を追加し、`e2e/scripts/selfcheck-recover-ubuntu.sh` と `pnpm --dir e2e run selfcheck:recover-ubuntu` で temp の `ubuntu.sources` fixture を `http` から `https` へ直せるかを自己検証できるようにした
+- 影響範囲: recovery 分岐のローカル検証、別 server 実機が無い段階での回帰確認、`doctor/fix/recover` のテスト容易性
+- 次の推奨アクション: 次は `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp fixture 上で `recover:ubuntu` の修正分岐が通ることを確認する
+
+### `selfcheck:recover-ubuntu` は temp fixture 上で `test:sso:auto` まで完走した
+
+- 背景: recovery 分岐の自己検証入口は用意していたが、実際に temp fixture で `doctor -> fix -> doctor -> verify:ubuntu` が最後まで通るかはまだ README に実績として残っていなかった。ここが pass していれば、別 Ubuntu Server 実機が無い段階でも apt source recovery の回帰をローカルで閉じられる
+- 決定事項: `pnpm --dir e2e run selfcheck:recover-ubuntu` を実行し、temp の `ubuntu.sources` fixture に対して `recover:ubuntu` が `http` を検知し、`fix:ubuntu-apt-sources` で `https` へ書き換えたあと `verify:ubuntu` と `test:sso:auto` まで完走することを確認した。最終的に `ap-frontend-sso-recovery.spec.ts` は `6 passed`、selfcheck 自体も `selfcheck passed: recover:ubuntu rewrote the temp apt source fixture to https and completed verification.` で終了した
+- 影響範囲: `e2e/scripts/selfcheck-recover-ubuntu.sh`、`e2e/scripts/recover-ubuntu-e2e.sh`、Ubuntu apt recovery 分岐のローカル回帰基準、別 server 実機が無い段階での検証手順
+- 次の推奨アクション: 次は別 Ubuntu Server 実機で `pnpm --dir e2e run triage:ubuntu` を流し、real `/etc/apt` と shared library 状態でも `report -> doctor -> verify/recover` が同じ導線で進むかを確認する
+
+### Ubuntu recovery 実機確認は保留し、次テーマは browser 回帰の横展開へ移る
+
+- 背景: `recover:ubuntu` の temp fixture selfcheck までは完了したが、別 Ubuntu Server 実機の準備はまだできていないため、`triage:ubuntu` の real `/etc/apt` / shared library 検証はこのチャットでは進められなかった。一方で AP Frontend 側は users / logout-relogin の browser 回帰基盤がかなり整っており、次は SSO recovery 以外の画面へ同じ E2E 方針を広げる方が開発の流れに合っている
+- 決定事項: Ubuntu recovery の実機確認は保留とし、次チャットの開始テーマは「SSO recovery 以外の browser 回帰へ拡張」に切り替える。最初の対象候補は users に続いて実装が進みそうな `objects` / `policies` 画面とし、既存の `ap-frontend-sso-recovery.spec.ts` で使っている live stack 前提・container 回帰・文言固定を避ける assertion 方針を横展開する
+- 影響範囲: 別 Ubuntu Server 実機確認の再開タイミング、次チャットの AP Frontend browser E2E 計画、objects / policies 実装時の回帰方針
+- 次の推奨アクション: 次チャットでは `ap-server/frontend` の `objects` / `policies` 実装位置と現状 UI を確認し、browser 回帰をどの spec に切り出すか、users 系 spec に追加するか新 spec を作るかを先に決めてから着手する
+
+### 別 server 実機の切り分けは `report:ubuntu` を先に採る
+
+- 背景: 実機で `recover:ubuntu` や `verify:ubuntu` が詰まった時、会話ごとに `uname`, apt source, `doctor`, `ldd`, `wait:stack` を個別に聞くのは往復が増えやすかった
+- 決定事項: `e2e/scripts/report-ubuntu-e2e.sh` と `pnpm --dir e2e run report:ubuntu` を追加し、別 server 実機ではまずこの出力を採る前提にする
+- 影響範囲: 別 Ubuntu Server 実機の切り分け開始手順、サポート時の共有情報、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run report:ubuntu` を実行し、その出力を起点に `recover:ubuntu` か `verify:ubuntu` へ進む
+
+### 別 server 実機の最初の入口は `triage:ubuntu` に寄せる
+
+- 背景: 実機に入った直後は `report` を採るべきか、そのまま `verify` へ進むべきか、apt source 修正が要るのかを人が判断していた
+- 決定事項: `e2e/scripts/triage-ubuntu-e2e.sh` と `pnpm --dir e2e run triage:ubuntu` を追加し、最初に `report:ubuntu` を採ったあと `doctor` の結果に応じて `verify:ubuntu` か `recover:ubuntu` へ自動で進む入口に寄せる
+- 影響範囲: 別 Ubuntu Server 実機の初手コマンド、診断情報の採取順序、今後の handoff
+- 次の推奨アクション: 次は別の Ubuntu Server 実機で `pnpm --dir e2e run triage:ubuntu` を実行し、そのまま `verify` か `recover` へつながるかを確認する
+
+### browser 実行環境整備はいったん区切り、AP 側の session lifecycle へ戻る
+
+- 背景: browser 実行環境の整備を続けるうちに、本題の AP Frontend 実装よりも「別 Ubuntu Server 実機での運用確認」に作業が寄り始めていた。一方、この Ubuntu Server ではすでに `pnpm --dir e2e run test:sso:auto` とローカル `pnpm --dir e2e run test:sso` が通っており、SSO recovery の実測基盤としては十分な到達点に達していた
+- 決定事項: browser 実行環境まわりは現時点で一区切りにし、別 server 実機向けの `triage / recover / report` は将来の運用確認用として残す。本題の次工程は AP Frontend / Backend の auth UX と session lifecycle 実装へ戻す
+- 影響範囲: `e2e` の今後の優先度、次チャット以降の実装対象、AP Frontend の auth handoff
+- 次の推奨アクション: 次は AP Frontend で `SSO Login` の対になる logout / session reset 導線を揃え、bridge で取得した token を明示的に手放せるようにする
+
+### AP Frontend の session 終了は `SSO Logout` と local `Reset Session` を分けて扱う
+
+- 背景: `global login -> /auth/bridge -> /auth/callback` の復帰導線は通ったが、AP Frontend 側には `SSO Login` の対になる終了導線が薄く、live mode token を localStorage に残したままになりやすかった。debug 時の token クリアと、実運用の global SSO logout は目的が違うため、同じボタンに寄せると意味が曖昧になりやすい
+- 決定事項: AP Frontend では session 終了を 2 系統に分ける。実運用向けには `global.example.com/logout?return_to=https://ap.example.com/?logged_out=1#auth-entry` を使う `SSO Logout` を用意し、押下前に AP Frontend 側の local token / current_user / authorization も clear する。debug 用には redirect を伴わない `Reset Session` を残し、token override と local auth state だけを外せるようにする
+- 影響範囲: `laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/composables/useApAuth.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、今後の logout 完了後 UX
+- 次の推奨アクション: 次は `SSO Logout` を実ブラウザで押して `logged_out=1#auth-entry` へ戻り、Auth Entry に logout 完了案内と再ログイン導線が期待どおり出るかを確認する
+
+### `SSO Logout` は global BFF の logout callback を挟むと `logged_out=1#auth-entry` まで戻せる
+
+- 背景: `SSO Logout` を browser 実測したところ、最初は Keycloak logout 後に `https://global.example.com/` へ戻ってしまい、AP Frontend の `logged_out=1#auth-entry` へは復帰できなかった。原因は `global-login` client の post logout redirect が `global.example.com/*` 前提で、AP へ直接返すと吸収されていたことだった
+- 決定事項: `global.example.com/logout` は Keycloak へ直接 AP URL を渡さず、いったん `global.example.com/logout/callback?return_to=...` を post logout redirect に使う。callback から `ap.example.com/?logged_out=1#auth-entry` へ server-side redirect し、Playwright 実測でも `SSO Logout -> Logout Complete -> Bearer Token: missing` まで確認できた
+- 影響範囲: `laravel-overlay/routes/web.php`、`laravel-overlay/app/Http/Controllers/GlobalAuthController.php`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/README.md`、AP Frontend の logout 完了後 UX、今後の logout 回帰確認
+- 次の推奨アクション: 次は logout 後の dashboard home だけでなく、users 一覧や users 詳細からでも同じ `SSO Logout` 導線が自然に見つかるかを確認し、必要なら users 画面の recovery 文言にも logout 後の戻り先を補足する
+
+### users 一覧 / 詳細の recovery 文言にも logout 後の戻り先を補足する
+
+- 背景: `SSO Logout` 自体は dashboard header menu に置いてあったが、users 一覧や users 詳細で再認証案内だけを読むと「logout した時はどこへ戻るのか」が分かりにくかった。session をいったん閉じてから切り分け直す導線は users 画面上でも説明が揃っている方が迷いにくい
+- 決定事項: users 一覧 / 詳細の `Re-auth Flow` に「`SSO Logout` は右上のユーザーメニューにあり、実行後は `Auth Entry` へ戻る」案内を追加した。Playwright 実測でも users 一覧で `SSO Logout` menu item が見つかり、そのまま users 詳細へ進んだ後も同じ menu item が見つかることを確認してから logout を実行している
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 画面の auth recovery 文言、今後の logout discoverability 確認
+- 次の推奨アクション: 次は users 詳細で logout 後に戻った Auth Entry から再ログインし、元の users 文脈へ戻り直す導線まで 1 本の browser シナリオとして確認する
+
+### logout 後の Auth Entry では直前の users 文脈を覚えて再ログインへ戻す
+
+- 背景: `SSO Logout -> /?logged_out=1#auth-entry` までは通っていたが、その状態の `SSO Login` は `route.fullPath` をそのまま使うため、再ログイン後の戻り先が `/` に落ちていた。今回の本命は users 一覧 / 詳細から logout したあと、同じ users 文脈へ戻り直せることだった
+- 決定事項: `SSO Logout` 実行前に AP Frontend 側で現在の route を localStorage へ退避し、`logged_out=1` で表示された Auth Entry 上の `SSO Login` だけがその退避先を優先して `global.example.com/login -> /auth/bridge -> /auth/callback` の `next` に使う。再ログイン成功時には退避済み path を消し、通常時の `SSO Login` は引き続き現在画面の route を使う
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/components/dashboard/DashboardHeader.vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、logout 後の再ログイン UX、今後の users 文脈復帰確認
+- 次の推奨アクション: 次は users 詳細だけでなく、keyword 付き users 一覧や assignment 操作直前の detail state でも「logout 後の再ログインが同じ route/query に戻るか」を広げて確認する
+
+### users 詳細の「一覧へ戻る」は route object で query を引き継ぐ
+
+- 背景: logout 後に users 詳細へ戻り直す browser シナリオを詰める中で、詳細 URL 自体は `service_scope_id` / `tenant_scope_id` / `sort` 付きで復元できていた一方、「一覧へ戻る」だけが `/users` に落ちていた。`UButton` に `to` と `query` を別 prop で渡しても、実 navigation では query が引き継がれていなかった
+- 決定事項: users 詳細の back link は `to="/users"` + `query` 別指定ではなく、`{ path: '/users', query: backQuery }` の route object で渡す。これにより users 詳細から一覧へ戻る時も drill-down query を維持する
+- 影響範囲: `ap-server/frontend/app/pages/users/[keycloakSub].vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 詳細から一覧へ戻る導線、logout/re-login 後の文脈復帰確認
+- 次の推奨アクション: 次は users 詳細で assignment 操作後にも同じ back link が query を保つかを browser で追加確認する
+
+### users 詳細の assignment 操作後も keyword 付き文脈で logout/re-login できる
+
+- 背景: 直前の到達点では users 詳細の route/query 復元と「一覧へ戻る」の query 維持までは確認できていたが、README に残していた次の宿題は `keyword` 付き一覧と assignment 操作を挟んだ detail state でも同じ文脈へ戻れるかだった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` に、`/users?service_scope_id=2&tenant_scope_id=3&keyword=bob&sort=-email` から `tenant-user-b` 詳細へ入り、`Tenant Operator` を追加した状態で `SSO Logout -> Auth Entry -> SSO Login` を通したあとも `/users/tenant-user-b?...&keyword=bob&sort=-email` へ戻る確認を追加した。再ログイン後は追加した assignment が残っていることを見てから削除し、最後に「一覧へ戻る」で `keyword=bob` 付き一覧へ戻るところまで 1 本で通す
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 詳細の assignment 追加/削除 UI、logout 後の detail/list 文脈復帰、`keyword` を含む back link 維持
+- 次の推奨アクション: 次は service のみ選択した一覧や別 tenant の drill-down でも同じ recovery が成り立つかを広げ、必要なら users 一覧側にも query 復帰の回帰ケースを追加する
+
+### users recovery の 4 本は live stack でも通過済み
+
+- 背景: keyword 付き assignment recovery を spec に足した段階では、まず test discovery だけを見ていて、live stack 上で本当に `SSO Login / Logout / assignment add-remove / query 復帰` が揃って通るかは未確認だった
+- 決定事項: `2026-04-20` に `pnpm --dir e2e test:sso` を実行し、`ap-frontend-sso-recovery.spec.ts` の 4 本すべてが live stack で通ることを確認した。今回追加した `keyword=bob` + `Tenant Operator` add/remove + logout/re-login recovery も pass しており、現時点では users 一覧 / 詳細 / assignment 文脈復帰の最小回帰セットを live で持てている
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、AP Frontend の users recovery 導線、今後の browser 回帰確認の基準
+- 次の推奨アクション: 次は service のみ選択した一覧や別 tenant でも同じ recovery が通るかを追加し、必要なら `test:sso` を tag/grep で分割して失敗箇所を切り分けやすくする
+
+### service-only recovery は Auth Entry の live 復帰不安定さが残るため `fixme` 扱いにした
+
+- 背景: 次の coverage 拡張として service-only (`service_scope_id` のみ、tenant 未選択) 文脈の logout/re-login recovery を追加しようとしたが、live 実測では `tenant-user-a` 詳細から logout したあと Auth Entry が `MOCK / Guest` で戻るケースがあり、`Live` を押しても直ちに `SSO Login` が復帰しないことがあった。加えて frontend 編集直後の dev server 再ビルドでは `/auth/callback` の dynamic import 500 にも当たり、service-only と assignment recovery を一緒に新規必須ケースへ上げるには不安定要素が残った
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` では service-only recovery を `test.fixme(...)` として意図だけ残し、live の安定回帰セットは `4 passed + 1 skipped` に保った。detail recovery については Auth Entry に `SSO Login` が見えない時だけ、同じ `next` を付けた global login URL へ直接戻る fallback を test 側に入れ、route/query 復帰そのものの確認は継続する
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry の live/mock 切り替え UX、logout 後 recovery の browser 回帰、service-only 文脈の今後の実装判断
+- 次の推奨アクション: 次は Auth Entry が `logged_out=1` で戻った時に live mode と `SSO Login` 表示を安定して復元できるかを frontend 側で直し、そのあと `service_scope_id` のみの recovery test を `fixme` から通常 test へ戻す
+
+### Auth Entry の `SSO Login` 表示条件だけでは `next=/` 問題は解けなかった
+
+- 背景: `logged_out=1` で戻った Auth Entry に `SSO Login` を出せれば service-only まで戻せると見て、`AppAuthPanel` 側で logout 復帰時の `SSO Login` / `Logout Complete` 表示条件や click 導線を何通りか試した
+- 決定事項: `2026-04-20` 時点の live 実測では、Auth Entry 上に `SSO Login` を出しても detail / assignment / service-only の再ログイン後 URL は引き続き `auth/bridge?next=/` に落ちた。つまり詰まりどころは「ボタンが見えるか」より先に、`logoutReturnNext` を Auth Entry の `SSO Login` が正しく解決できていない点にある。今回の実験変更は rollback し、suite は従来の fallback 付き `4 passed + 1 skipped` 前提へ戻した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/composables/useApSso.ts`、Auth Entry の recovery 導線、service-only recovery の unblock 方針
+- 次の推奨アクション: 次は `globalLoginUrl()` / `loginReturnPath()` / `readStoredLogoutReturnNext()` の SSR・hydration 境界を直接点検し、`logged_out=1` 画面で描画された `SSO Login` がいつ `/` を握るのかをコードレベルで潰す
+
+### `logoutReturnNext` は reactive state に載せて hydration 後の `SSO Login` 再評価を通す
+
+- 背景: `useApSso` を追うと、`loginReturnPath()` は `logged_out=1` 時に `readStoredLogoutReturnNext()` を見るが、従来実装は `localStorage` をその場で読むだけだった。そのため SSR では必ず `null` になり、Auth Entry の `SSO Login` が一度 `next=/` で描画されると、hydration 後も reactive な再評価が走らず service-only / detail / assignment の復帰先が root に固定されやすかった
+- 決定事項: `useApSso` に `useState('ap-sso-logout-return-next')` を追加し、client setup で `localStorage` から同期する形へ変更した。`storeLogoutReturnNext()` / `clearStoredLogoutReturnNext()` も同じ state を更新し、`readStoredLogoutReturnNext()` は reactive state を優先する。これにより `globalLoginUrl()` が hydration 時点で logout return path を握り直せる構成に寄せた
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、Auth Entry の `SSO Login` href 解決、logout 後の users/detail/service-only 文脈復帰
+- 次の推奨アクション: 次は live stack で `pnpm --dir e2e run test:sso` を流し、fallback なしでも Auth Entry の `SSO Login` が `auth/bridge?next=<stored path>` を組み立てるか、特に service-only recovery を `fixme` から戻せるかを確認する
+
+### コンテナ検証では detail/assignment 復帰は改善したが logout 直後の Auth Entry 表示はまだ不安定
+
+- 背景: hydration 修正後は host 環境ではなく実運用どおりの container 経路で確認する必要があったため、`ap-frontend` コンテナで `npm run lint` / `npm run typecheck` を回し、その後 Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を実行した
+- 決定事項: `ap-frontend` コンテナ内の `lint` と `typecheck` は通過した。一方 E2E は `3 passed, 1 failed, 1 skipped` で、失敗したのは `tests/ap-frontend-sso-recovery.spec.ts:94` の logout case だった。`ensureLiveAuthEntry()` 内で `Live` を押したあとも `SSO Login` link が見えず、`detail` と `keyword + assignment` の logout/re-login は通っているので、今回の hydration 修正は `next=/` 固定の改善には効いたが、logout 直後の Auth Entry UI 安定化はまだ別課題として残っている
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry の `Live` / `SSO Login` 表示安定性、service-only recovery の unblock 判断
+- 次の推奨アクション: 次は `AppAuthPanel` / `useApAuth` 側で `logged_out=1` 復帰時に `Live` 切り替え後の `needsAuthRecovery` と `SSO Login` 表示条件がなぜ揺れるかを確認し、同じ Playwright container コマンドで logout case 単体を先に再確認する
+
+### logout 復帰 UI は `logged_out=1` を先に見せつつ return path を cookie でも保持する
+
+- 背景: `SSO Login` を `logged_out=1` でも先に見せるだけだと logout case 自体は通るようになったが、今度は SSR が古い `href` を描画する瞬間に click されると `auth/bridge?next=/` へ戻り、通常 login や detail recovery まで root へ落ちる不安定さが見えた。つまり必要だったのは「表示を早めること」だけでなく、SSR 初回描画から正しい return path を持たせることだった
+- 決定事項: `AppAuthPanel` では `logged_out=1` の時点で `SSO Login` を見せ、`SSO Logout` は非表示にする。加えて `useApSso` では logout return path を localStorage だけでなく cookie にも保存し、`useState('ap-sso-logout-return-next')` の初期値と server/client 両方の `readStoredLogoutReturnNext()` が cookie を読めるようにした。これで Auth Entry の SSR HTML でも `globalLoginUrl()` が正しい `next` を持てる
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/composables/useApSso.ts`、logout 後の Auth Entry SSR、`SSO Login` の href 安定性、users/detail recovery
+- 次の推奨アクション: 次は service-only recovery を Playwright container で通常 test に戻せるかを確認し、不要になった fallback があれば `ap-frontend-sso-recovery.spec.ts` 側から順に外す
+
+### Playwright コンテナ再実測で `4 passed + 1 skipped` を回復した
+
+- 背景: `logged_out=1` 時の UI 表示と return path 保持をあわせて直したあとは、container 経路で通常 login / logout / detail recovery / assignment recovery が揃って戻るかを見直す必要があった
+- 決定事項: `ap-frontend` コンテナで `npm run lint` / `npm run typecheck` を再実行し、その後 `pnpm --dir e2e run test:sso:container` を流した結果、`ap-frontend-sso-recovery.spec.ts` は `4 passed, 1 skipped` で通過した。以前失敗していた logout case も pass し、通常 login と detail / keyword assignment recovery で `next=/` への逆戻りは再現しなかった
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/composables/useApSso.ts`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、今後の container 回帰基準
+- 次の推奨アクション: 次は service-only case を `fixme` から通常 test に戻すか、少なくとも fallback なしで通るかを同じ Playwright container コマンドで先に確かめる
+
+### service-only recovery も container で通ったので SSO 回帰は 5 本へ戻した
+
+- 背景: `next=/` 問題と `logged_out=1` の Auth Entry 揺れが収まったあとも、最後に残っていた宿題は service-only (`service_scope_id` のみ、tenant 未選択) 文脈を `fixme` から戻せるかだった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の service-only case を `test.fixme(...)` から通常 `test(...)` へ戻し、Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果、`5 passed` で通過した。`/users?service_scope_id=2&keyword=alice&sort=-email` から `tenant-user-a` 詳細へ入り、`SSO Logout -> Auth Entry -> SSO Login` 後も detail/list の両方で query 復帰が確認できた
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、service-only 文脈の logout/re-login 回帰、今後の AP Frontend browser 回帰の最小基準
+- 次の推奨アクション: 次は fallback 付きの `resumeSsoLogin()` をまだ残す必要があるかを見直し、不要なら Auth Entry の自然導線だけで通る形へ test を整理する
+
+### `resumeSsoLogin()` の fallback は不要になったので自然導線へ寄せた
+
+- 背景: `SSO Login` が見えない時だけ global login URL へ直接 `page.goto(...)` する fallback は、Auth Entry の `SSO Login` と `logoutReturnNext` が不安定だった時期の保険として残していた。ここが不要なら test helper も期待する UX に揃えた方が回帰の意味がはっきりする
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の `resumeSsoLogin()` は fallback を削除し、`ensureLiveAuthEntry()` のあと Auth Entry 上の `SSO Login` をそのまま click する形へ簡素化した。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行しても `5 passed` を維持できたため、現時点では自然導線だけで十分と扱う
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry recovery の test helper、今後の browser 回帰の期待値
+- 次の推奨アクション: 次は helper から `ensureLiveAuthEntry()` 自体もどこまで必要かを見直し、`logged_out=1` で `SSO Login` が初回描画から見える前提にさらに寄せられるかを確認する
+
+### `logged_out=1` の Auth Entry では `Live` click も不要だった
+
+- 背景: `resumeSsoLogin()` の fallback を外したあとも、helper にはまだ `ensureLiveAuthEntry()` という名前で「`SSO Login` が無ければ `Live` を押す」時代の名残が残っていた。frontend 側を直した今、この click 自体が不要なら test はもっと素直に Auth Entry の自然表示を検証できる
+- 決定事項: `ensureLiveAuthEntry()` から `Live` button click を削除し、単に Auth Entry 上の `SSO Login` link が visible になることだけを待つ helper へ簡素化した。その状態でも Playwright 公式コンテナの `pnpm --dir e2e run test:sso:container` は `5 passed` を維持したため、`logged_out=1` 復帰後は初回描画から `SSO Login` が見える前提で扱ってよい
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry recovery helper、logout 完了画面の今後の期待値
+- 次の推奨アクション: 次は `ensureLiveAuthEntry()` という helper 名も含めて整理し、実態どおり `waitForSsoLoginLink()` のような待機 helper へ置き換えるか、呼び出し側へ直接 `expect(...SSO Login...)` を寄せる
+
+### helper 名も `waitForSsoLoginLink()` に揃えた
+
+- 背景: helper の中身を `SSO Login` 可視待ちだけにした時点で、`ensureLiveAuthEntry()` という名前は実態より大きく、読む側に「mode 切り替えや recovery 判定まで含むのでは」と誤解を残していた
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の helper 名を `waitForSsoLoginLink()` へ変更し、`resumeSsoLogin()` もこの戻り値の locator をそのまま click する形へそろえた。Playwright 公式コンテナの `pnpm --dir e2e run test:sso:container` は引き続き `5 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry recovery helper の可読性、今後の test メンテナンス
+- 次の推奨アクション: 次は helper をさらに薄くして各 test に `expect(page.getByRole('link', { name: 'SSO Login' }))` を直接書くか、今の小さな helper を維持するかを決める
+
+### `SSO Login` 待機 helper も不要だったので spec に直接寄せた
+
+- 背景: `waitForSsoLoginLink()` まで薄くした段階で、helper 自体の役割はほぼ `expect(page.getByRole(...))` 1 行ぶんだけになっていた。これなら helper を介するより call site に直接置いた方が、各 test が「Auth Entry 上の SSO Login を待って押す」ことをそのまま読める
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` から `waitForSsoLoginLink()` helper を削除し、logout case では `expect(page.getByRole('link', { name: 'SSO Login' }))` を直接書く形へ、`resumeSsoLogin()` でも同じ locator をその場で待って click する形へ寄せた。Playwright 公式コンテナの `pnpm --dir e2e run test:sso:container` は引き続き `5 passed` を維持した
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、Auth Entry recovery spec の見通し、今後の helper 設計方針
+- 次の推奨アクション: 次は `resumeSsoLogin()` 自体も残すかを見直し、各 test に「wait -> click -> Keycloak login」を直接書く方が自然ならそこまで平坦化する
+
+### `resumeSsoLogin()` も inline 化できたが logout complete 表示は単発で揺れた
+
+- 背景: helper を減らせるだけ減らす流れの最後として、`resumeSsoLogin()` 自体も各 test に inline 化し、recovery 手順を scenario 本文から直接読めるようにしたかった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` から `resumeSsoLogin()` を削除し、各 scenario に `SSO Login` wait -> click -> `submitKeycloakLogin()` を直接書いた。Playwright 公式コンテナで最初の再実行では logout case だけ `Logout Complete` が見えない単発 failure に当たったが、同じ状態での再実行では `5 passed` に戻ったため、inline 化自体は保持する。ただし `logged_out=1` 復帰の logout complete 表示はまだ軽い揺れが残る前提を引き継ぐ
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、logout/re-login spec の可読性、Auth Entry logout complete 表示の安定度メモ
+- 次の推奨アクション: 次は logout case の `Logout Complete` / `mode` 表示が揺れる原因を詰めるか、現状どおり「再実行で解消する軽微な flake」として扱うかを決める
+
+### logout complete の揺れは frontend 表示条件と E2E 文言待ちを合わせて吸収した
+
+- 背景: `logged_out=1` 復帰では `SSO Login` 自体は見えているのに、`mode` が一時的に `MOCK` に見える断面で `Logout Complete` だけ消えることがあった。また E2E 側の文言 assertion も、実装に存在しない `SSO Logout.*Auth Entry` に寄っていて不必要に脆かった
+- 決定事項: frontend では `AppAuthPanel` の `Logout Complete` card を `mode === 'live'` 条件から外し、`logged_out=1` だけで表示するようにした。E2E では logout case の最後の assertion を、実実装の完了文言である `global SSO logout が完了 ... local token もクリア` へ合わせた。この状態で `ap-frontend` コンテナの `lint` / `typecheck` を通し、Playwright 公式コンテナの `pnpm --dir e2e run test:sso:container` も `5 passed` を確認した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、`e2e/tests/ap-frontend-sso-recovery.spec.ts`、logout complete 表示、logout case の E2E 安定性
+- 次の推奨アクション: 次は login/callback timeout の単発揺れまで追うかを決め、必要なら `/auth/callback` 完了待ちの観測を増やして flake の再現条件を記録する
+
+### login/callback timeout の単発揺れは現時点では追い込まず `5 passed` を成功ラインに据える
+
+- 背景: callback timeout は一度だけ `auth/callback` で止まる形で見えたが、logout complete の揺れを吸収したあと同じ Playwright container 回帰を複数回流すと、`pnpm --dir e2e run test:sso:container` は続けて `5 passed` になり、artifact も残らなかった。再現条件が薄い段階で callback へ観測コードを足すより、まず成功ラインを固定した方が引継ぎしやすい
+- 決定事項: `2026-04-20` 時点では login/callback timeout は「単発で見えたが直近の再実行では再現していない軽微な flake」と扱い、追加実装は入れない。browser 回帰の成功ラインは引き続き Playwright 公式コンテナでの `5 passed` とする。再発した時だけ `/auth/callback` の token exchange と `refreshCurrentUser()` の完了観測を増やす
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の現状維持、`ap-server/frontend/app/pages/auth/callback.vue` への追加観測タイミング、今後の flake 切り分け方針
+- 次の推奨アクション: 次はこの SSO recovery 一連の到達点を区切りとして、必要なら別テーマへ移る。callback timeout が再発した時は `auth/callback` と `useApSso.completeBridgeSession()` の観測追加から再開する
+
+### callback timeout 再発時だけ `?sso_debug=1` で trace を残す
+
+- 背景: callback timeout の再現性はまだ薄く、常時ログや UI 常設の debug 表示を入れると通常の SSO recovery 導線へノイズが増える。一方で再発時には、`token exchange` で止まったのか、`refreshCurrentUser()` で止まったのかをブラウザ側だけで即座に切り分けたい
+- 決定事項: `auth/callback` と `useApSso.completeBridgeSession()` には常時観測を入れず、`?sso_debug=1` を一度踏んだ tab だけ `sessionStorage["ap-sso-debug-trace"]` に段階 trace を残す。debug 有効化は同じ tab の users/detail/logout/re-login 導線にも持ち回り、必要なら `?sso_debug=0` で解除する。callback では `callback:received`、`callback:token-exchange:start|done|error`、`callback-page:refresh-current-user:start|done` など最小限の stage だけを積み、error 画面にも `Latest Stage` と trace 件数を表示する
+- 影響範囲: `ap-server/frontend/app/composables/useApSso.ts`、`ap-server/frontend/app/pages/auth/callback.vue`、callback timeout 再発時の browser-only 切り分け手順、users/detail 文脈での debug 再現性
+- 次の推奨アクション: 再発したら該当 tab で一度 `?sso_debug=1` を付けてから同じ導線を踏み、failure 時は callback error 画面の `Latest Stage` を先に確認し、必要なら DevTools の `sessionStorage["ap-sso-debug-trace"]` で全 trace を見て README へ追記する
+
+### callback stall 再発時の E2E 入口は `PLAYWRIGHT_SSO_DEBUG=1` に寄せる
+
+- 背景: callback summary UI を足した直後の Playwright 公式コンテナ再実行で、最初の login case が再び `auth/callback` 停滞で timeout した。通常回帰は `sso_debug` なしで流しているため、そのままだと frontend 側の trace を test failure に載せられない
+- 決定事項: callback stall の再発確認は browser 手動確認だけでなく、E2E 側でも `PLAYWRIGHT_SSO_DEBUG=1` を使って同じ trace を採れる前提に寄せる。Playwright helper はこの env が有効な時だけ `sso_debug=1` を載せ、`/auth/callback` で timeout した場合は `sessionStorage["ap-sso-debug-trace"]` を failure に添える。再発時の container 入口は `pnpm --dir e2e run test:sso:debug` に固定し、さらに standard run が落ちた直後に debug rerun まで自動で進める `pnpm --dir e2e run test:sso:triage` も追加した。triage script は `Callback trace` の JSON から `Callback latest stage` まで自動で要約し、`e2e/test-results/callback-triage-summary.txt` に保存する
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、`e2e/scripts/run-sso-triage.sh`、frontend callback trace の再利用先、今後の callback stall 調査手順
+- 次の推奨アクション: 次回 callback stall が再発したら、まず `pnpm --dir e2e run test:sso:triage` を流して standard failure と debug rerun をまとめて取り、`e2e/test-results/callback-triage-summary.txt` の `Callback latest stage` を README へ追記する
+
+### AP Frontend の auth recovery 文言は共通 util に寄せる
+
+- 背景: `Auth Entry` と users 一覧 / 詳細の `Re-auth Flow` は同じ SSO recovery 方針を案内しているのに、「本番向け復旧導線」「fresh token」「SSO Logout 後の戻り先」の言い回しが画面ごとに少しずつずれていた。今後 callback stall や `401/403` 案内を詰める時も、文言の基準点を 1 か所へ寄せておいた方が追従しやすい
+- 決定事項: `ap-server/frontend/app/utils/authRecoveryCopy.ts` を追加し、`setup / refresh / retry` の recovery 文言を共通化した。`AppAuthPanel` は title / body / steps をこの util から組み立て、users 一覧 / 詳細は同じ判断基準の body と logout 補足を共有しつつ、対象 API 名だけ surface ごとに差し替える形へそろえた。検証は `docker compose exec ap-frontend npm run lint`、`docker compose exec ap-frontend npm run typecheck`、`pnpm --dir e2e run test:sso:triage` で行い、triage の standard run は `5 passed` だった
+- 影響範囲: `ap-server/frontend/app/utils/authRecoveryCopy.ts`、`ap-server/frontend/app/components/AppAuthPanel.vue`、`ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、今後の auth recovery 文言修正
+- 次の推奨アクション: 次は `describeApApiError()` 側の `401/403` 文言もこの recovery 方針と突き合わせ、低レベル API エラー表示まで含めて「SSO Login を主導線、Auth Entry は debug 補助」の表現にそろえる
+
+### `describeApApiError()` の `401/403` も SSO Login 主導線へそろえる
+
+- 背景: `Re-auth Flow` はすでに「実運用では `SSO Login`、Auth Entry は debug 補助」という方針へ寄せたが、低レベル API エラー文言はまだ「fresh token を再設定」「Bearer token を再設定」の表現が前面に出ており、users 画面や Auth Entry の下部エラーだけ読むと debug 手順が主導線に見えやすかった
+- 決定事項: `ap-server/frontend/app/utils/apApiError.ts` の `401/403` 文言を更新し、まず `SSO Login` で session を張り直す案内を出し、debug を続ける時だけ Auth Entry で token と API Base を確認する形へそろえた。`403` は「期限切れ token か権限不足」、`401` は「session が外れている可能性」を短く補足する。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/utils/apApiError.ts`、`useApAuth()` の `errorMessage`、users 一覧 / 詳細 / assignment 操作時の低レベル API エラー表示
+- 次の推奨アクション: 次は `Failed to fetch` を含む network 系文言も同じ方針で見直し、証明書 / hosts 確認と SSO recovery の案内境界をどこで分けるかを整理する
+
+### `Failed to fetch` は network 前提確認を先に案内する
+
+- 背景: `401/403` を SSO recovery 主導線へ寄せたあとも、`Failed to fetch` は hosts と証明書確認だけを案内していて、「network 前提が直ったあとに session recovery を見る」の順序までは UI から読み取りにくかった。README 側では browser 実測の入口を `doctor` と hosts / URL 疎通確認へ寄せているため、低レベル文言も同じ境界でそろえたかった
+- 決定事項: `ap-server/frontend/app/utils/apApiError.ts` の `Failed to fetch` 文言を更新し、まず `ap-backend-fpm.example.com` の hosts と証明書許可を確認し、network 前提が直ったあとに session 切れが残る時だけ `SSO Login` か Auth Entry Debug で再確認する順序へ寄せた。これで network troubleshooting と auth recovery の責務境界を UI 上でも分ける。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/utils/apApiError.ts`、Auth Entry / users 一覧 / users 詳細 / assignment 操作の network failure 表示、今後の live browser 切り分け順序
+- 次の推奨アクション: 次は users 一覧 / 詳細の `Live Check` 固定文言も同じ方針で見直し、`Forbidden / CurrentUser 未取得 / Failed to fetch` がそれぞれ「SSO Login」「Auth Entry Debug」「hosts/証明書確認」のどれへつながるかを画面上で読み分けやすくする
+
+### users 一覧 / 詳細の `Live Check` も recovery と network の境界で書き分ける
+
+- 背景: 低レベル API エラー文言を整理したあとも、users 一覧 / 詳細の `Live Check` 固定文言はまだ「まず Auth Entry で fresh token」を前面に出していたため、`Forbidden / CurrentUser 未取得 / Failed to fetch` のどれで見ているのかが画面上で読み分けにくかった
+- 決定事項: `ap-server/frontend/app/pages/users/index.vue` と `ap-server/frontend/app/pages/users/[keycloakSub].vue` の `Live Check` を更新し、`Forbidden / CurrentUser 未取得 / 401/403` はまず `SSO Login` で session を張り直し、live debug を続ける時だけ Auth Entry で token と API Base を確認する流れへ寄せた。あわせて `Failed to fetch` は session recovery ではなく `ap-backend-fpm.example.com` の hosts と証明書許可を先に確認する文言へ分離した。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/pages/users/index.vue`、`ap-server/frontend/app/pages/users/[keycloakSub].vue`、users 画面の `Live Check`、今後の live browser 切り分け導線
+- 次の推奨アクション: 次は `AppAuthPanel` の `Live Mode Tips` と `Live Verification` 固定文言も同じ方針で見直し、Auth Entry 単体でも `SSO Login` / Auth Entry Debug / hosts・証明書確認 の役割分担が一貫して読めるようにする
+
+### `AppAuthPanel` の固定文言も recovery と network の境界でそろえる
+
+- 背景: users 画面の `Live Check` を整理したあとも、Auth Entry 側の `Live Mode Tips` と `Live Verification` には「fresh token を先に入れ替える」前提が残っていて、Auth Entry 単体で読むと `SSO Login` が実運用の主導線であることや、`Failed to fetch` が network 確認の話であることが少し伝わりづらかった
+- 決定事項: `ap-server/frontend/app/components/AppAuthPanel.vue` の固定文言を更新し、`CurrentUser 未取得 / 401/403` はまず `SSO Login` で session を張り直し、live debug を続ける時だけ Bearer token と API Base を確認する流れへそろえた。あわせて `Failed to fetch` は hosts / 証明書確認を先に見ること、`Live Verification` と token 入力フォームは debug 専用で通常の session recovery には使わないことを明記した。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、Auth Entry の `Live Mode Tips` / `Live Verification` / token override 補足文、今後の auth troubleshooting 説明順
+- 次の推奨アクション: 次は `Logout Complete` や `Authorization` 周辺の固定文言も同じ視点で見直し、Auth Entry 全体で「通常導線」「debug 導線」「network 導線」の 3 つが過不足なく読み分けられるかを確認する
+
+### `Logout Complete` と `Authorization` も通常導線優先でそろえる
+
+- 背景: `Live Mode Tips` と `Live Verification` を整理したあとも、`Logout Complete` には `SSO Login` と debug token 再設定が並列で並び、`Authorization` の不足メッセージはまだ「token を取り直す」が先に来ていたため、Auth Entry 全体で見た時の優先導線が少し揺れていた
+- 決定事項: `ap-server/frontend/app/components/AppAuthPanel.vue` の `Logout Complete` は「通常の再開は `SSO Login`、live debug の継続時だけ token 再設定」と読める文言へ変更した。`Authorization` では `user.manage` が見えない時の案内を、まず `SSO Login` で session を張り直し、debug を続ける時だけ token と API Base を確認して再取得する順序へ寄せた。検証は `docker compose exec ap-frontend npm run lint` と `docker compose exec ap-frontend npm run typecheck` を再実行して通過した
+- 影響範囲: `ap-server/frontend/app/components/AppAuthPanel.vue`、Auth Entry の logout 完了案内、`user.manage` 不足時の固定文言、Auth Entry 全体の導線優先度
+- 次の推奨アクション: 次は E2E に auth recovery 文言そのものを固定しない範囲で、少なくとも `SSO Login` と `Auth Entry Debug` の役割が users 画面から見えることを拾う軽い assertion を足すかを検討する
+
+### users recovery の E2E は文言固定ではなく CTA の役割だけを拾う
+
+- 背景: auth recovery 文言を段階的に整理した結果、今後も wording 自体は調整される可能性がある一方、users 画面では「通常導線は `SSO Login`」「debug 補助は `Auth Entry Debug`」という役割だけは崩したくなかった。とはいえ users 詳細は token なしの初回読み込みで detail API error へ落ちやすく、一覧と同じ recovery banner を常に安定表示できるわけではなかった
+- 決定事項: E2E では文言全文を固定せず、users 一覧の live + token なし状態で `Re-auth Flow` 内に `SSO Login` と `Auth Entry Debug` の両方が見えることだけを軽く確認する方針にした。users 詳細については、現時点では recovery banner の存在を別途固定せず、既存の logout/re-login 文脈復帰回帰に委ねる。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、users 一覧 recovery CTA の回帰基準、users 詳細 recovery banner の今後の扱い
+- 次の推奨アクション: 次は callback stall 再発時の切り分けを少し堅くするため、`readCallbackDebugTrace()` が page close 済みでも failure 要約を壊さないように E2E helper 側の例外吸収を検討する
+
+### callback trace helper は page close 済みでも timeout 要約を壊さない
+
+- 背景: callback stall が単発で再発した時、`waitForSsoArrival()` 自体の timeout より先に `readCallbackDebugTrace()` が `Target page, context or browser has been closed` で落ち、もともとの URL wait failure を読み取りにくくすることがあった。既知 flake の切り分けでは、trace が取れない時でも「page already closed」という診断付きで元の timeout を残す方が引き継ぎしやすい
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の `readCallbackDebugTrace()` を安全化し、page がすでに閉じている時は例外ではなく `unavailable: page already closed` を返すようにした。`waitForSsoArrival()` も current URL を安全に読み、callback 上での timeout か page close 済みの断面なら、元の wait error を `cause` に残したまま `Current URL` と `Callback trace` の要約を組み立てる。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時の failure 要約、今後の triage readability
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `test:sso:triage` の summary と新しい helper 要約が噛み合うかを見て、必要なら `Current URL` / `Callback trace` の wording をもう一段短くする
+
+### callback helper の文面は triage summary と重複しすぎないよう圧縮する
+
+- 背景: `test:sso:triage` 側はすでに `Callback latest stage` や trace 件数を要約してくれるため、helper 側まで説明文を増やしすぎると、再発時ログで同じ情報が重複して見えやすかった。helper には「どの path を待っていたか」「callback URL はどこだったか」「trace 生データは取れたか」だけ残っていれば十分だった
+- 決定事項: `e2e/tests/ap-frontend-sso-recovery.spec.ts` の timeout 要約を短くし、先頭行は `SSO callback timeout while waiting for ...`、URL 行は `Callback URL: ...` に寄せ、`SSO debug enabled` の 1 行は削除した。`Callback trace:` の prefix だけは triage script が拾うため維持する。Playwright 公式コンテナで `pnpm --dir e2e run test:sso:container` を再実行した結果は `6 passed` だった
+- 影響範囲: `e2e/tests/ap-frontend-sso-recovery.spec.ts`、callback stall 再発時のログ可読性、`print-callback-trace-summary.mjs` と helper 文面の役割分担
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `test:sso:triage` を流し、新しい helper 文面と `callback-triage-summary.txt` の要約が読みやすく噛み合っているかを実例で確認する
+
+### callback triage の読み味は fixture selfcheck で先に確認できる
+
+- 背景: 次の推奨アクションは本来 callback stall の実再発待ちだったが、再発待ちのままだと helper 文面と `callback-triage-summary.txt` の相性確認が進まなかった。まずは sample failure log で、helper の `Callback trace:` 行と triage summary の `Callback latest stage` が過不足なく並ぶかを先に見ておきたかった
+- 決定事項: `e2e/scripts/selfcheck-callback-triage.sh` と `pnpm --dir e2e run selfcheck:callback-triage` を追加し、圧縮済み helper 文面を含む sample timeout log から `print-callback-trace-summary.mjs` の出力を自己確認できるようにした。selfcheck は `Callback trace count: 3`、`Callback latest stage: callback:token-exchange:error`、`Callback latest at: ...` まで検証し、実行結果は pass した
+- 影響範囲: `e2e/scripts/selfcheck-callback-triage.sh`、`e2e/package.json`、callback triage wording の事前確認手順、再発待ち前の自己検証
+- 次の推奨アクション: 次は callback stall が実際に再発した時に `pnpm --dir e2e run test:sso:triage` を流し、実ログでも selfcheck と同じ読み味になっているかを確認する
+
+### `test:sso:triage` は現時点では standard pass のまま維持できている
+
+- 背景: selfcheck で helper 文面と triage summary の読み味は先に確認できたが、実スタック側でも現時点の `test:sso:triage` がどう振る舞うかは別途見ておきたかった。callback stall が再発していない状態でも、standard run がそのまま pass するなら「再発時の入口はこのままでよい」と明示できる
+- 決定事項: `pnpm --dir e2e run test:sso:triage` を実行し、Playwright 公式コンテナの standard run が `6 passed`、debug rerun なしで終了することを確認した。現時点では triage 自体の導線に問題はなく、callback stall が実再発した時だけ同じ入口から debug rerun と summary 採取へ進めばよい
+- 影響範囲: `e2e/scripts/run-sso-triage.sh` の現運用、callback stall 未再発時の期待値、次回 triage 開始条件
+- 次の推奨アクション: 次は callback stall の実再発を待ち、再発した時点で `pnpm --dir e2e run test:sso:triage` を流して helper 文面と `callback-triage-summary.txt` の実ログ上の噛み合いを確認する

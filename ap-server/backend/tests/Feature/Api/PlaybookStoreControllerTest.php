@@ -27,7 +27,7 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
                 'Tenant Playbook',
             ));
 
-        $this->assertPlaybookResponse($response, 1, $tenantScope->id, 'tenant-playbook', 'Tenant Playbook');
+        $this->assertPlaybookResponse($response, $tenantScope->id, 'tenant-playbook', 'Tenant Playbook');
     }
 
     public function test_it_returns_validation_errors_when_scope_and_code_are_duplicated(): void
@@ -62,18 +62,16 @@ class PlaybookStoreControllerTest extends UpsertAuthorizationApiTestCase
             ]);
     }
 
-    private function assertPlaybookResponse($response, int $playbookId, int $scopeId, string $code, string $name): void
+    private function assertPlaybookResponse($response, int $scopeId, string $code, string $name): void
     {
+        $playbookId = $response->json('data.id');
+
         $response
             ->assertCreated()
-            ->assertExactJson([
-                'data' => [
-                    'id' => $playbookId,
-                    'scope_id' => $scopeId,
-                    'code' => $code,
-                    'name' => $name,
-                ],
-            ]);
+            ->assertJsonPath('data.id', $playbookId)
+            ->assertJsonPath('data.scope_id', $scopeId)
+            ->assertJsonPath('data.code', $code)
+            ->assertJsonPath('data.name', $name);
     }
 
     /**

@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBooleanSoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['keycloak_sub', 'display_name', 'email'])]
-class ApUser extends Model
+class ApUser extends BaseModel
 {
+    use HasBooleanSoftDeletes;
+
     protected $table = 'ap_users';
 
     protected $primaryKey = 'keycloak_sub';

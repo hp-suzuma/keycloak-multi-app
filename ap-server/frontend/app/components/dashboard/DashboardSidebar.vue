@@ -16,11 +16,20 @@ const assignmentCount = computed(() => authorization.value?.assignments.length ?
 <template>
   <aside class="flex h-full min-h-0 flex-col">
     <div class="shrink-0 border-b border-default/80 px-4 py-5">
-      <div class="flex items-center gap-3" :class="props.collapsed ? 'justify-center' : ''">
+      <div
+        class="flex items-center gap-3"
+        :class="props.collapsed ? 'justify-center' : ''"
+      >
         <div class="flex size-11 items-center justify-center rounded-2xl bg-stone-900 text-white">
-          <UIcon name="i-lucide-orbit" class="size-6" />
+          <UIcon
+            name="i-lucide-orbit"
+            class="size-6"
+          />
         </div>
-        <div v-if="!props.collapsed" class="min-w-0">
+        <div
+          v-if="!props.collapsed"
+          class="min-w-0"
+        >
           <p class="truncate text-sm font-semibold text-highlighted">
             {{ meta.line1 }}
           </p>
@@ -31,12 +40,21 @@ const assignmentCount = computed(() => authorization.value?.assignments.length ?
       </div>
     </div>
 
-    <div class="shrink-0 border-b border-default/80 px-4 py-4" v-if="!props.collapsed">
+    <div
+      v-if="!props.collapsed"
+      class="shrink-0 border-b border-default/80 px-4 py-4"
+    >
       <div class="flex flex-wrap gap-2">
-        <UBadge color="neutral" variant="soft">
+        <UBadge
+          color="neutral"
+          variant="soft"
+        >
           {{ assignmentCount }} assignments
         </UBadge>
-        <UBadge color="primary" variant="soft">
+        <UBadge
+          color="primary"
+          variant="soft"
+        >
           {{ effectivePermissions.length }} permissions
         </UBadge>
       </div>
@@ -44,8 +62,15 @@ const assignmentCount = computed(() => authorization.value?.assignments.length ?
 
     <div class="min-h-0 flex-1 overflow-y-auto px-3 py-4">
       <div class="space-y-6">
-        <section v-for="group in navGroups" :key="group.title" class="space-y-2">
-          <p v-if="!props.collapsed" class="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+        <section
+          v-for="group in navGroups"
+          :key="group.title"
+          class="space-y-2"
+        >
+          <p
+            v-if="!props.collapsed"
+            class="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted"
+          >
             {{ group.title }}
           </p>
 
@@ -59,8 +84,14 @@ const assignmentCount = computed(() => authorization.value?.assignments.length ?
                 ? 'bg-cyan-50 text-cyan-900 shadow-sm dark:bg-cyan-950/30 dark:text-cyan-100'
                 : 'text-toned hover:bg-stone-100/80 dark:hover:bg-stone-800/60'"
             >
-              <UIcon :name="item.icon" class="size-5 shrink-0" />
-              <div v-if="!props.collapsed" class="min-w-0">
+              <UIcon
+                :name="item.icon"
+                class="size-5 shrink-0"
+              />
+              <div
+                v-if="!props.collapsed"
+                class="min-w-0"
+              >
                 <p class="truncate text-sm font-medium">
                   {{ item.label }}
                 </p>
